@@ -6,13 +6,12 @@
 const expect = @import("std").testing.expect;
 
 test "tuple" {
-
     const values = .{
         @as(u32, 123),
         @as(f64, 12.3),
         true,
         "hi",
-    } ++ .{ false} ** 2;
+    } ++ .{false} ** 2;
 
     try expect(values[0] == 123);
     try expect(values[1] == 12.3);

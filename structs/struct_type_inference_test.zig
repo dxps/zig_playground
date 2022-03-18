@@ -15,7 +15,6 @@ test "anonymous struct literal, provided for instantiation" {
 }
 
 test "fully anonymous struct literal" {
-    
     try dump(.{
         .myInt = @as(u32, 123),
         .myFloat = @as(f64, 12.3),
