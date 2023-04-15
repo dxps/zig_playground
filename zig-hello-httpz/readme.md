@@ -6,7 +6,8 @@ This is a starting point of playing with [http.zig](https://github.com/karlsegui
 
 ### Setup
 
-Note that `build.zig` declares the `"httpz"` module, providing a full path to the location where `http.zig` project exists, aka where its repo has been cloned (`git clone git@github.com:karlseguin/http.zig.git`). This path must point (correctly reflect) your local setup.
+1. Use Zig ver. 0.11 (or newer), since this example and its `httpz` dependency both are using native Zig module.
+2. The `httpz` dependency is declared in `build.zig` file by providing a full path to the location where the starting point file of `http.zig` project exists. This path must point (correctly reflect) your local setup, aka where you cloned (`git clone git@github.com:karlseguin/http.zig.git`) that project's repo.
 
 <br/>
 
