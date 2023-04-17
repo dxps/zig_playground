@@ -16,7 +16,7 @@ pub fn start(allocator: Allocator) !void {
 }
 
 fn index(_: *httpz.Request, res: *httpz.Response) !void {
-    res.body = 
+    res.body =
         \\<!DOCTYPE html>
         \\ <ul>
         \\ <li><a href="/hello?name=Teg">Querystring + text output</a>
@@ -34,7 +34,7 @@ fn hello(req: *httpz.Request, res: *httpz.Response) !void {
     // var out = try std.fmt.allocPrint(res.arena, "Hello {s}", .{name});
     // res.body = out
 
-    // another is to use res.writer(), which might be more efficient in some cases
+    // Another is to use res.writer(), which might be more efficient in some cases.
     try std.fmt.format(res.writer(), "Hello {s}", .{name});
 }
 

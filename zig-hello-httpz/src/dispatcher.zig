@@ -2,13 +2,13 @@ const std = @import("std");
 const httpz = @import("httpz");
 const Allocator = std.mem.Allocator;
 
-// Our global state (just like global.zig)
+/// The global state.
 const GlobalContext = struct {
     hits: usize = 0,
     l: std.Thread.Mutex = .{},
 };
 
-// our per-request data
+/// Per-request data.
 const RequestContext = struct {
     user_id: ?[]const u8,
     global: *GlobalContext,
@@ -16,7 +16,8 @@ const RequestContext = struct {
 
 pub fn start(allocator: Allocator) !void {
     var ctx = GlobalContext{};
-    var server = try httpz.ServerCtx(*GlobalContext, *RequestContext).init(allocator, .{ .pool_size = 10, .port = 5884 }, &ctx);
+    var server = try httpz.ServerCtx(*GlobalContext, *RequestContext)
+        .init(allocator, .{ .pool_size = 10, .port = 5884 }, &ctx);
     server.dispatcher(dispatcher);
     var router = server.router();
     router.get("/increment", increment);
