@@ -8,6 +8,11 @@ A hello world like project as a starting point for playing with zap.
 
 Use the standard `zig build run` to start it.
 
+For a better development experience, you can:
+
+-   install [air](https://github.com/air-verse/air) and
+-   use `./run-dev.sh` to start the app and have it restarted on detected changes
+
 <br/>
 
 ### Usage

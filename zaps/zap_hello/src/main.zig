@@ -44,7 +44,8 @@ fn loadUserData(a: std.mem.Allocator) !void {
 }
 
 pub fn main() !void {
-    const a = std.heap.page_allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
+    const a = gpa.allocator();
 
     try loadUserData(a);
 

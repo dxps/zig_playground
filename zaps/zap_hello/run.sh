@@ -1,3 +1,4 @@
 #!/bin/sh
 
-zig build run
+air
+
