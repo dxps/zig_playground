@@ -18,8 +18,10 @@ fn on_request(r: zap.Request) void {
         const user = users.get(user_id);
 
         if (user == null) {
-            std.debug.print("<< {s}", .{"not found"});
             r.setStatus(.not_found);
+            var buff: [128]u8 = undefined;
+            const resp = zap.stringifyBuf(&buff, .{ .error_message = "User not found" }, .{}) orelse return;
+            r.sendBody(resp) catch return;
             return;
         }
 
@@ -34,7 +36,8 @@ fn on_request(r: zap.Request) void {
 const UserMap = std.AutoHashMap(usize, User);
 
 var users: UserMap = undefined;
-fn setupUserData(a: std.mem.Allocator) !void {
+
+fn loadUserData(a: std.mem.Allocator) !void {
     users = UserMap.init(a);
     try users.put(1, .{ .first_name = "Joe" });
     try users.put(2, .{ .first_name = "Jane", .last_name = "Black" });
@@ -42,7 +45,9 @@ fn setupUserData(a: std.mem.Allocator) !void {
 
 pub fn main() !void {
     const a = std.heap.page_allocator;
-    try setupUserData(a);
+
+    try loadUserData(a);
+
     var listener = zap.HttpListener.init(.{
         .port = 3000,
         .on_request = on_request,
