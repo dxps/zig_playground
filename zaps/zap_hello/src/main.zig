@@ -11,16 +11,18 @@ fn on_request(r: zap.Request) void {
 
     // /user/n
     if (r.path) |the_path| {
-        if (the_path.len < 7 or !std.mem.startsWith(u8, the_path, "/user/"))
+        if (the_path.len < 7 or !std.mem.startsWith(u8, the_path, "/users/")) {
+            r.setStatus(.not_found);
             return;
+        }
 
-        const user_id: usize = @as(usize, @intCast(the_path[6] - 0x30));
+        const user_id: usize = @as(usize, @intCast(the_path[7] - 0x30));
         const user = users.get(user_id);
 
         if (user == null) {
             r.setStatus(.not_found);
             var buff: [128]u8 = undefined;
-            const resp = zap.stringifyBuf(&buff, .{ .error_message = "User not found" }, .{}) orelse return;
+            const resp = zap.stringifyBuf(&buff, .{ .error_message = "User not found." }, .{}) orelse return;
             r.sendBody(resp) catch return;
             return;
         }
@@ -60,9 +62,9 @@ pub fn main() !void {
         \\ Listening on 0.0.0.0:3000
         \\ 
         \\ Check out:
-        \\ http://localhost:3000/user/1   # -- first user
-        \\ http://localhost:3000/user/2   # -- second user
-        \\ http://localhost:3000/user/3   # -- non-existing user
+        \\ http://localhost:3000/users/1   # -- First user.
+        \\ http://localhost:3000/users/2   # -- Second user.
+        \\ http://localhost:3000/users/3   # -- Non-existing user.
         \\
     , .{});
 
