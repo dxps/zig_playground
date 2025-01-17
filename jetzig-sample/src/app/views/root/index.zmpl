@@ -8,7 +8,7 @@
   </head>
 
   <body>
-    <div class="flex h-screen justify-center items-center pt-10 m-auto">
+    <div class="flex h-screen justify-center items-center text-center pt-10 m-auto">
       <!-- If present, renders the `message_param` response data value, add `?message=hello` to the
            URL to see the output: -->
       <h2 class="param text-3xl text-[#f7931e]">{{.message_param}}</h2>
