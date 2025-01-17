@@ -1,6 +1,6 @@
 ## Zap Hello
 
-A hello world like project as a starting point for playing with zap.
+A _hello world_ like project as a starting point for playing with zap.
 
 <br/>
 
@@ -8,10 +8,10 @@ A hello world like project as a starting point for playing with zap.
 
 Use the standard `zig build run` to start it.
 
-For a better development experience, you can:
+For a better development experience (have the app restarted on code changes), you can:
 
 -   install [air](https://github.com/air-verse/air) and
--   use `./run-dev.sh` to start the app and have it restarted on detected changes
+-   use `./run-dev.sh` to start the app
 
 <br/>
 
@@ -25,4 +25,7 @@ See in its output the paths to call using HTTP GET.
 
 ### Project creation notes
 
-After `zig init`, the `zap` dependency was added using `zig fetch --save "git+https://github.com/zigzap/zap#v0.9.1"`. A small cleanup to remove `src/root.zig` and related elements in `build.zig.zon` was also done.
+-   project created using `zig init`
+-   `zap` dependency was added using:<br/>
+    `zig fetch --save "git+https://github.com/zigzap/zap#v0.9.1"`
+-   small cleanup: removed `src/root.zig` and related elements (in `build.zig.zon` file).

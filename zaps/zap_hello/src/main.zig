@@ -1,59 +1,42 @@
 const std = @import("std");
 const zap = @import("zap");
+const users = @import("users.zig");
+const api = @import("api.zig");
 
-const User = struct {
-    first_name: ?[]const u8 = null,
-    last_name: ?[]const u8 = null,
-};
+var routes: api.Routes = undefined;
 
 fn on_request(r: zap.Request) void {
-    if (r.methodAsEnum() != .GET) return;
-
-    // /user/n
     if (r.path) |the_path| {
-        if (the_path.len < 7 or !std.mem.startsWith(u8, the_path, "/users/")) {
-            r.setStatus(.not_found);
+
+        // If the path matches a route, call the handler.
+        if (routes.get(the_path)) |handler| {
+            handler(r);
             return;
         }
 
-        const user_id: usize = @as(usize, @intCast(the_path[7] - 0x30));
-        const user = users.get(user_id);
+        std.debug.print(" Route not found: {s}\n", .{the_path});
 
-        if (user == null) {
-            r.setStatus(.not_found);
-            var buff: [128]u8 = undefined;
-            const resp = zap.stringifyBuf(&buff, .{ .error_message = "User not found." }, .{}) orelse return;
-            r.sendBody(resp) catch return;
-            return;
-        }
-
-        var buf: [100]u8 = undefined;
-        if (zap.stringifyBuf(&buf, user, .{})) |json| {
-            r.setContentType(.JSON) catch return;
-            r.sendBody(json) catch return;
-        }
+        // Otherwise, 404.
+        r.setStatus(.not_found);
+        r.sendFile("public/404.html") catch |err| {
+            std.log.err("Failed to send 404 page: {}", .{err});
+            r.sendBody("404 - Not Found") catch return;
+        };
     }
-}
-
-const UserMap = std.AutoHashMap(usize, User);
-
-var users: UserMap = undefined;
-
-fn loadUserData(a: std.mem.Allocator) !void {
-    users = UserMap.init(a);
-    try users.put(1, .{ .first_name = "Joe" });
-    try users.put(2, .{ .first_name = "Jane", .last_name = "Black" });
 }
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
     const a = gpa.allocator();
 
-    try loadUserData(a);
+    try users.initStore(a);
+
+    routes = try api.init_routes(a);
 
     var listener = zap.HttpListener.init(.{
         .port = 3000,
         .on_request = on_request,
+        .public_folder = "public",
         .log = false,
     });
     try listener.listen();
@@ -71,6 +54,6 @@ pub fn main() !void {
     // start worker threads
     zap.start(.{
         .threads = 2,
-        .workers = 1, // user map cannot be shared among multiple worker processes
+        .workers = 1, // users map cannot be shared among multiple worker processes
     });
 }
