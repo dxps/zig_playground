@@ -1,0 +1,10 @@
+services:
+    postgres:
+        image: postgres:16
+        container_name: postgres_jetzig_blog
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: jetzig_blog
+        ports:
+            - '5456:5432'
