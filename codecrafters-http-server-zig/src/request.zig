@@ -32,14 +32,6 @@ pub const Request = struct {
         return request_line_iter.next();
     }
 
-    //this function might be unnecessary
-    fn is_echo(self: *Self) ?bool {
-        if (self.get_target()) |target| {
-            return std.mem.startsWith(u8, target, "/echo");
-        }
-        return null;
-    }
-
     // Get request's header.
     fn get_header(self: *Self, header_name: []const u8) ?[]const u8 {
         var header_iter = std.mem.splitSequence(u8, self.headers, "\r\n");

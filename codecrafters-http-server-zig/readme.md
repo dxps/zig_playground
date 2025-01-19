@@ -16,16 +16,15 @@ and more.
 
 ## Setup
 
--   Ensure you have `zig (0.14)` installed locally
--   Run `./your_program.sh` to run your program, which is implemented in
-    `src/main.zig`.
+-   Ensure you have `zig 0.12 or 0.13 or 0.14` installed locally.
+-   Run `./your_program.sh` to run your program.
 
 <br/>
 
 ## Usage
 
 ```bash
-curl -i http://localhost:4221/ # must respond with OK
-curl -i http://localhost:4221/echo/abc # must respond with OK and body: abc
-curl --header "User-Agent: foobar/1.2.3" http://localhost:4221/user-agent # must respond with OK and body: foobar/1.2.3
+curl -i http://localhost:4221/              # responds with OK (HTTP 200)
+curl -i http://localhost:4221/echo/abc      # responds with OK (HTTP 200) and body: abc
+curl --header "User-Agent: foobar/1.2.3" http://localhost:4221/user-agent  # responds with OK (HTTP 200) and body: foobar/1.2.3
 ```
