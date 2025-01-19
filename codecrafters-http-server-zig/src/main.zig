@@ -56,8 +56,8 @@ pub fn main() !void {
         var header_line = buff_iter.next();
         while (header_line != null) {
             line_iter = std.mem.splitAny(u8, header_line.?, " ");
-            const header_name = lowercase(a, line_iter.next().?);
-            if (!std.mem.startsWith(u8, header_name, "user-agent")) {
+            const header_name = line_iter.next().?;
+            if (!std.ascii.eqlIgnoreCase(header_name, "user-agent:")) {
                 header_line = buff_iter.next();
             } else {
                 const user_agent = line_iter.next().?;
@@ -86,9 +86,4 @@ fn respond_ok_with_text_and_body(a: Allocator, stream: anytype, body: []const u8
 
 fn respond_not_found(stream: anytype) !void {
     try stream.writeAll("HTTP/1.1 404 Not Found\r\n\r\n");
-}
-
-fn lowercase(a: Allocator, line: []const u8) []const u8 {
-    const tmp: []u8 = a.alloc(u8, line.len) catch unreachable;
-    return std.ascii.lowerString(tmp, line);
 }
