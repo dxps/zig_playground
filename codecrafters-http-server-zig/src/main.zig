@@ -76,7 +76,11 @@ fn respond_ok(stream: anytype) !void {
 }
 
 fn respond_ok_with_text_and_body(a: Allocator, stream: anytype, body: []const u8) !void {
-    const res = try std.fmt.allocPrint(a, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {d}\r\n\r\n{s}", .{ body.len, body });
+    const res = try std.fmt.allocPrint(
+        a,
+        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {d}\r\n\r\n{s}",
+        .{ body.len, body },
+    );
     try stream.writeAll(res);
 }
 
