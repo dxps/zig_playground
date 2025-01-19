@@ -16,6 +16,6 @@ and more.
 
 ---
 
--   Ensure you have `zig (0.12)` installed locally
+-   Ensure you have `zig (0.14)` installed locally
 -   Run `./your_program.sh` to run your program, which is implemented in
     `src/main.zig`.

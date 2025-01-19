@@ -1,12 +1,6 @@
 const std = @import("std");
 const net = std.net;
-
-fn _printout(comptime format: []const u8, args: anytype) void {
-    std.io.getStdOut().writer().print(format, args) catch |err| {
-        std.log.err("Failed to print to stdout: {}", .{err});
-    };
-}
-const printout: fn (comptime format: []const u8, args: anytype) void = _printout;
+const printout = @import("printout.zig").printout;
 
 pub fn main() !void {
     const address = try net.Address.resolveIp("127.0.0.1", 4221);
@@ -17,6 +11,16 @@ pub fn main() !void {
 
     printout("Listening to 127.0.0.1:4221 ...\n", .{});
 
-    _ = try listener.accept();
-    printout("Client connected!\n", .{});
+    var conn = try listener.accept();
+
+    printout("Received connection from {}.\n", .{conn.address});
+
+    // Explicitly handle the potential error.
+    _ = conn.stream.write("HTTP/1.1 200 OK\r\n\r\n") catch |err| {
+        std.log.err("Failed to write to connection: {}", .{err});
+    };
+    conn.stream.close();
+
+    // This is the concise version (at least minimal enough for the current case).
+    // try conn.stream.writeAll("HTTP/1.1 200 OK\r\n\r\n");
 }
