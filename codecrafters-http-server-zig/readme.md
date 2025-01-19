@@ -27,4 +27,5 @@ and more.
 ```bash
 curl -i http://localhost:4221/ # must respond with OK
 curl -i http://localhost:4221/echo/abc # must respond with OK and body: abc
+curv --header "User-Agent: foobar/1.2.3" http://localhost:4221/user-agent # must respond with OK and body: foobar/1.2.3
 ```
