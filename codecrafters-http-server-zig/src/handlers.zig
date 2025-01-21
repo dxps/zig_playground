@@ -20,7 +20,9 @@ pub fn handle_connection(conn: net.Server.Connection, log: ?std.fs.File.Writer, 
     }
 
     var req = Request.parse(buffer[0..data_len]);
-    if (std.mem.eql(u8, req.get_target().?, "/")) {} else {
+    if (std.mem.eql(u8, req.get_target().?, "/")) {
+        respond_ok(conn);
+    } else {
         var route_iter = std.mem.splitSequence(u8, req.get_target().?, "/");
         // skip the first '/' as there is nothing in front of it
         _ = route_iter.next();

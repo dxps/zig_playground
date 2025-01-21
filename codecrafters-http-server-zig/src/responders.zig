@@ -4,7 +4,7 @@ const net = std.net;
 pub fn respond_ok(conn: net.Server.Connection) void {
     std.fmt.format(
         conn.stream.writer(),
-        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{s}",
+        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
         .{},
     ) catch respond_internal_error(conn);
 }
