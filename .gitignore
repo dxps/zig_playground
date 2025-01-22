@@ -3,3 +3,5 @@
 zig-out
 .idea
 
+build-errors.log
+

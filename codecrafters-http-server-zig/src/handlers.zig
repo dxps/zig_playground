@@ -1,18 +1,20 @@
 const std = @import("std");
 const net = std.net;
+const Allocator = std.mem.Allocator;
 const log = @import("log.zig").log;
 const Request = @import("request.zig").Request;
 const responders = @import("responders.zig");
 const respond_ok = responders.respond_ok;
 const respond_ok_with_body = responders.respond_ok_with_body;
+const respond_ok_with_octet_and_body = responders.respond_ok_with_octet_and_body;
 const respond_not_found = responders.respond_not_found;
 const respond_internal_error = responders.respond_internal_error;
 
-pub fn handle_connection(conn: net.Server.Connection, alloc: std.mem.Allocator) void {
+pub fn handle_connection(conn: net.Server.Connection, files_directory: []const u8, a: Allocator) void {
     defer conn.stream.close();
 
-    const buffer = alloc.alloc(u8, 512) catch return respond_internal_error(conn);
-    defer alloc.free(buffer);
+    const buffer = a.alloc(u8, 512) catch return respond_internal_error(conn);
+    defer a.free(buffer);
 
     const data_len = conn.stream.read(buffer) catch return respond_internal_error(conn);
 
@@ -40,16 +42,21 @@ pub fn handle_connection(conn: net.Server.Connection, alloc: std.mem.Allocator) 
         respond_ok_with_body(req.get_user_agent().?, conn);
     } else if (std.mem.eql(u8, route_iter.peek().?, "files")) {
         _ = route_iter.next(); // skip what we peeked, a: []const T, b: []const T))
-        if (route_iter.peek()) |_| {
-            // const filepath = try std.fmt.allocPrint(alloc, "/tmp/{s}", .{part}) catch return respond_internal_error(conn);
-            const filepath = "/tmp/foo";
+        if (route_iter.peek()) |part| {
+            const filepath = std.fmt.allocPrint(a, "{s}/{s}", .{ files_directory, part }) catch |err| {
+                log("Error appending slices for filepath: {any}", .{err});
+                respond_internal_error(conn);
+                return;
+            };
             log("Looking for '{s}' file ...\n", .{filepath});
-
-            if (get_file_contents_size(filepath)) |content| {
-                respond_ok_with_body(content, conn);
-            } else {
-                respond_not_found(conn);
-            }
+            const content = get_file_contents_size(filepath, a) catch |err| {
+                log("Err: {any}", .{err});
+                if (err == error.FileNotFound) {
+                    return respond_not_found(conn);
+                }
+                return respond_internal_error(conn);
+            };
+            respond_ok_with_octet_and_body(content, conn);
         }
     } else {
         respond_not_found(conn);
@@ -58,12 +65,11 @@ pub fn handle_connection(conn: net.Server.Connection, alloc: std.mem.Allocator) 
     log("HTTP response sent\n", .{});
 }
 
-fn get_file_contents_size(filename: []const u8) ![]const u8 {
+fn get_file_contents_size(filename: []u8, a: Allocator) ![]u8 {
     const file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
     defer file.close();
-    const stat = try file.stat();
-    const size = stat.size;
-    var content = std.mem.zeroInit([size]u8, undefined);
-    try file.readAll(&content);
+    const file_size = (try file.stat()).size;
+    const content = try a.alloc(u8, file_size);
+    _ = try file.readAll(content);
     return content;
 }

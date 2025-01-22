@@ -9,10 +9,20 @@ pub fn respond_ok(conn: net.Server.Connection) void {
     ) catch respond_internal_error(conn);
 }
 
+/// Respond with "Content-Type: text/plain" (header) and provided body.
 pub fn respond_ok_with_body(body: []const u8, conn: net.Server.Connection) void {
     std.fmt.format(
         conn.stream.writer(),
         "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{s}",
+        .{ body.len, body },
+    ) catch respond_internal_error(conn);
+}
+
+/// Respond with "Content-Type: application/octet-stream" (header) and provided body.
+pub fn respond_ok_with_octet_and_body(body: []const u8, conn: net.Server.Connection) void {
+    std.fmt.format(
+        conn.stream.writer(),
+        "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{s}",
         .{ body.len, body },
     ) catch respond_internal_error(conn);
 }

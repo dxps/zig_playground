@@ -14,17 +14,33 @@ and more.
 
 <br/>
 
-## Setup
+## Setup & Run
 
--   Ensure you have `zig 0.12 or 0.13 or 0.14` installed locally.
+-   Ensure you have `zig 0.12 or 0.13` installed locally.
 -   Run `./your_program.sh` to run your program.
+-   For the case of serving files, use `zig-0.12 build run -- --directory /tmp/test`<br/>
+    (`/tmp/test` is just an example.)
+
+Notes: I had to use zig 0.12 due to an external limitation.
 
 <br/>
 
 ## Usage
 
+To access the `/` and `/echo` routes, use:
+
 ```bash
 curl -i http://localhost:4221/              # responds with OK (HTTP 200)
 curl -i http://localhost:4221/echo/abc      # responds with OK (HTTP 200) and body: abc
+```
+
+To access `/user-agent` GET API operation that returns the `User-Agent` header provided in the request, use:
+
+```bash
 curl --header "User-Agent: foobar/1.2.3" http://localhost:4221/user-agent  # responds with OK (HTTP 200) and body: foobar/1.2.3
 ```
+
+To serve files:
+
+-   start the app using `zig-0.12 build run -- --directory /tmp/test` (as also previously mentioned)
+-   use `curl -v http://localhost:4221/files/foo` and it will return the content of the file (in this example `/tmp/test/foo` file) if it exists (with `Content-Type: application/octet-stream` header), or 404 if it doesn't exist
