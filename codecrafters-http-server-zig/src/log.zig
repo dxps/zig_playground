@@ -10,6 +10,6 @@ pub fn initLog(logger: std.fs.File.Writer) void {
 /// Log a message.
 pub fn log(comptime format: []const u8, args: anytype) void {
     if (_logger) |logger| {
-        logger.print(format, args) catch return;
+        logger.print(">>> " ++ format, args) catch return;
     }
 }

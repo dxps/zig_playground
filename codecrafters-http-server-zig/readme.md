@@ -27,7 +27,7 @@ Notes: I had to use zig 0.12 due to an external limitation.
 
 ## Usage
 
-To access the `/` and `/echo` routes, use:
+To access the root (`/`) and `/echo` routes, use:
 
 ```bash
 curl -i http://localhost:4221/              # responds with OK (HTTP 200)
@@ -42,5 +42,11 @@ curl --header "User-Agent: foobar/1.2.3" http://localhost:4221/user-agent  # res
 
 To serve files:
 
--   start the app using `zig-0.12 build run -- --directory /tmp/test` (as also previously mentioned)
--   use `curl -v http://localhost:4221/files/foo` and it will return the content of the file (in this example `/tmp/test/foo` file) if it exists (with `Content-Type: application/octet-stream` header), or 404 if it doesn't exist
+-   Start the app using `zig-0.12 build run -- --directory /tmp/test` (as also previously mentioned)
+-   Use `curl -v http://localhost:4221/files/foo` and it will return the content of the file (in this example `/tmp/test/foo` file) if it exists (with `Content-Type: application/octet-stream` header), or 404 if it doesn't exist
+
+To write files:
+
+-   Start the app using `zig-0.12 build run -- --directory /tmp/test` (as also previously mentioned)
+-   Use `curl -v --data "123456789" -H "Content-type: application/octe678t-stream" http://localhost:4221/files/foo2` <br/>
+    Of course, you may test the result by getting it back, using `curl -v http://localhost:4221/files/foo2`

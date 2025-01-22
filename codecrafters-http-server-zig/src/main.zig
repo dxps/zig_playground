@@ -2,7 +2,7 @@ const std = @import("std");
 const net = std.net;
 const Allocator = std.mem.Allocator;
 const cli = @import("zig-cli");
-const handle_connection = @import("handlers.zig").handle_connection;
+const handleConnection = @import("handlers.zig").handleConnection;
 const log = @import("log.zig").log;
 const initLog = @import("log.zig").initLog;
 
@@ -51,7 +51,7 @@ fn run_server() !void {
 
     while (true) {
         const connection = try listener.accept();
-        try pool.spawn(handle_connection, .{
+        try pool.spawn(handleConnection, .{
             connection,
             files_directory,
             alloc.allocator(),

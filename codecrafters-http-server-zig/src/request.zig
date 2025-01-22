@@ -20,7 +20,7 @@ pub const Request = struct {
     }
 
     // Get request's HTTP method.
-    fn get_method(self: *Self) []const u8 {
+    pub fn get_method(self: *Self) []const u8 {
         var request_line_iter = std.mem.splitSequence(u8, self.request_line, " ");
         return request_line_iter.first();
     }
@@ -33,7 +33,7 @@ pub const Request = struct {
     }
 
     // Get request's header.
-    fn get_header(self: *Self, header_name: []const u8) ?[]const u8 {
+    pub fn get_header(self: *Self, header_name: []const u8) ?[]const u8 {
         var header_iter = std.mem.splitSequence(u8, self.headers, "\r\n");
         while (header_iter.next()) |header| {
             var header_split = std.mem.splitSequence(u8, header, ": ");
