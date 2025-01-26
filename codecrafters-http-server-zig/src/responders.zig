@@ -63,7 +63,7 @@ pub fn respondOkWithGzipAndCompressedBody(body: []const u8, conn: net.Server.Con
     ) catch respondInternalError(conn);
 }
 
-/// Respond with Internal Server Error.
+/// Respond with Not Found.
 pub fn respondNotFound(conn: net.Server.Connection) void {
     conn.stream.writeAll("HTTP/1.1 404 Not Found\r\n\r\n") catch return;
 }
