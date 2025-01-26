@@ -36,7 +36,14 @@ curl -i http://localhost:4221/              # responds with OK (HTTP 200)
 curl -i http://localhost:4221/echo/abc      # responds with OK (HTTP 200) and body: abc
 ```
 
-On `/echo`, if you send `Accept-Encoding: gzip` header, the response will consider it (include `Content-Encoding: gzip` header).
+On `/echo`:
+
+-   If you send `Accept-Encoding: gzip` header, the response will consider it (include `Content-Encoding: gzip` header).
+-   If you send multiple compression schemes:
+    -   If provided compression schemes are all invalid, the response won't consider any of them.<br/>
+        Ex: `curl -v -H "Accept-Encoding: invalid-encoding" http://localhost:4221/echo/abc`
+    -   If provided compression schemes contain `gizp`, this will be considered in the response.<br/>
+        Ex: `curl -v -H "Accept-Encoding: invalid-encoding-1, gzip, invalid-encoding-2" http://localhost:4221/echo/abc`
 
 ### Get /user-agent
 

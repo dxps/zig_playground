@@ -29,7 +29,7 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
     }
 
     var route_iter = std.mem.splitSequence(u8, req.getTarget().?, "/");
-    // skip the first '/' as there is nothing in front of it
+    // skip the first '/'
     _ = route_iter.next();
 
     //////////////////
@@ -39,8 +39,12 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
         _ = route_iter.next(); // skip what we peeked
         if (route_iter.peek()) |word| {
             if (req.getHeader("Accept-Encoding")) |encoding| {
-                if (std.mem.eql(u8, encoding, "gzip")) {
-                    return respond_ok_with_gzip_and_body(word, conn);
+                var it = std.mem.splitAny(u8, encoding, ",");
+                while (it.next()) |enc| {
+                    const e = std.mem.trim(u8, enc, " ");
+                    if (std.mem.eql(u8, e, "gzip")) {
+                        return respond_ok_with_gzip_and_body(word, conn);
+                    }
                 }
             }
             respond_ok_with_body(word, conn);
