@@ -4,27 +4,28 @@ const Allocator = std.mem.Allocator;
 const log = @import("log.zig").log;
 const Request = @import("request.zig").Request;
 const responders = @import("responders.zig");
-const respond_ok = responders.respondOk;
-const respond_created = responders.respondCreated;
-const respond_ok_with_body = responders.respondOkWithBody;
-const respond_ok_with_octet_and_body = responders.respondOkWithOctetAndBody;
-const respond_ok_with_gzip_and_body = responders.respondOkWithGzipAndBody;
-const respond_not_found = responders.respondNotFound;
-const respond_internal_error = responders.respondInternalError;
+const respondOk = responders.respondOk;
+const respondCreated = responders.respondCreated;
+const respondOkWithBody = responders.respondOkWithBody;
+const respondOkWithOctetAndBody = responders.respondOkWithOctetAndBody;
+const respondOkWithGzipAndBody = responders.respondOkWithGzipAndBody;
+const respondOkWithGzipAndCompressedBody = responders.respondOkWithGzipAndCompressedBody;
+const respondNotFound = responders.respondNotFound;
+const respondInternalError = responders.respondInternalError;
 
 pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8, a: Allocator) void {
     defer conn.stream.close();
 
-    const buffer = a.alloc(u8, 512) catch return respond_internal_error(conn);
+    const buffer = a.alloc(u8, 512) catch return respondInternalError(conn);
     defer a.free(buffer);
 
-    const data_len = conn.stream.read(buffer) catch return respond_internal_error(conn);
+    const data_len = conn.stream.read(buffer) catch return respondInternalError(conn);
 
     log("Received request: '{s}'.\n", .{buffer[0..data_len]});
 
     var req = Request.parse(buffer[0..data_len]);
     if (std.mem.eql(u8, req.getTarget().?, "/")) {
-        respond_ok(conn);
+        respondOk(conn);
         return;
     }
 
@@ -43,13 +44,14 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
                 while (it.next()) |enc| {
                     const e = std.mem.trim(u8, enc, " ");
                     if (std.mem.eql(u8, e, "gzip")) {
-                        return respond_ok_with_gzip_and_body(word, conn);
+                        log("Responding with gzip encoding for '{s}' word.\n", .{word});
+                        return respondOkWithGzipAndCompressedBody(word, conn);
                     }
                 }
             }
-            respond_ok_with_body(word, conn);
+            respondOkWithBody(word, conn);
         } else {
-            respond_not_found(conn);
+            respondNotFound(conn);
         }
     }
 
@@ -58,7 +60,7 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
     /////////////////
     else if (std.mem.eql(u8, route_iter.peek().?, "user-agent")) {
         _ = route_iter.next(); // skip what we peeked
-        respond_ok_with_body(req.getUserAgent().?, conn);
+        respondOkWithBody(req.getUserAgent().?, conn);
     }
 
     ////////////
@@ -70,7 +72,7 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
         if (route_iter.peek()) |filename| {
             const filepath = std.fmt.allocPrint(a, "{s}/{s}", .{ files_directory, filename }) catch |err| {
                 log("Error appending slices for filepath: {any}", .{err});
-                respond_internal_error(conn);
+                respondInternalError(conn);
                 return;
             };
             if (std.mem.eql(u8, req.getMethod(), "GET")) {
@@ -78,19 +80,19 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
                 const content = getFileContents(filepath, a) catch |err| {
                     log(">>> Err: {any}", .{err});
                     if (err == error.FileNotFound) {
-                        return respond_not_found(conn);
+                        return respondNotFound(conn);
                     }
-                    return respond_internal_error(conn);
+                    return respondInternalError(conn);
                 };
-                respond_ok_with_octet_and_body(content, conn);
+                respondOkWithOctetAndBody(content, conn);
             } else if (std.mem.eql(u8, req.getMethod(), "POST")) {
                 log("Trying to write to '{s}' file ...\n", .{filepath});
-                writeFile(filepath, req.body) catch return respond_internal_error(conn);
-                respond_created(conn);
+                writeFile(filepath, req.body) catch return respondInternalError(conn);
+                respondCreated(conn);
             }
         }
     } else {
-        respond_not_found(conn);
+        respondNotFound(conn);
     }
 
     log("HTTP response sent\n", .{});

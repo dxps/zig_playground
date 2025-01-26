@@ -43,7 +43,37 @@ On `/echo`:
     -   If provided compression schemes are all invalid, the response won't consider any of them.<br/>
         Ex: `curl -v -H "Accept-Encoding: invalid-encoding" http://localhost:4221/echo/abc`
     -   If provided compression schemes contain `gizp`, this will be considered in the response.<br/>
-        Ex: `curl -v -H "Accept-Encoding: invalid-encoding-1, gzip, invalid-encoding-2" http://localhost:4221/echo/abc`
+        Ex: `curl -v -H "Accept-Encoding: invalid-encoding-1, gzip, invalid-encoding-2" http://localhost:4221/echo/abc`<br/>
+        Or use `curl -v -H "Accept-Encoding: gzip" http://localhost:4221/echo/abc | hexdump -C`
+
+Complete example of using `/echo` with compressed response:
+
+```shell
+❯ curl -v -H "Accept-Encoding: gzip" http://localhost:4221/echo/abc | hexdump -C
+*   Trying 127.0.0.1:4221...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Connected to localhost (127.0.0.1) port 4221 (#0)
+> GET /echo/abc HTTP/1.1
+> Host: localhost:4221
+> User-Agent: curl/7.81.0
+> Accept: */*
+> Accept-Encoding: gzip
+>
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Content-Type: text/plain
+< Content-Encoding: gzip
+< Content-Length: 23
+<
+{ [23 bytes data]
+100    23  100    23    0     0  33093      0 --:--:-- --:--:-- --:--:-- 23000
+* Connection #0 to host localhost left intact
+00000000  1f 8b 08 00 00 00 00 00  00 03 4b 4c 4a 06 00 c2  |..........KLJ...|
+00000010  41 24 35 03 00 00 00                              |A$5....|
+00000017
+❯
+```
 
 ### Get /user-agent
 
