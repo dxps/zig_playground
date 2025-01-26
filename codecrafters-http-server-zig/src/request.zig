@@ -20,20 +20,20 @@ pub const Request = struct {
     }
 
     // Get request's HTTP method.
-    pub fn get_method(self: *Self) []const u8 {
+    pub fn getMethod(self: *Self) []const u8 {
         var request_line_iter = std.mem.splitSequence(u8, self.request_line, " ");
         return request_line_iter.first();
     }
 
     // Get request's URL.
-    pub fn get_target(self: *Self) ?[]const u8 {
+    pub fn getTarget(self: *Self) ?[]const u8 {
         var request_line_iter = std.mem.splitSequence(u8, self.request_line, " ");
         _ = request_line_iter.first();
         return request_line_iter.next();
     }
 
     // Get request's header.
-    pub fn get_header(self: *Self, header_name: []const u8) ?[]const u8 {
+    pub fn getHeader(self: *Self, header_name: []const u8) ?[]const u8 {
         var header_iter = std.mem.splitSequence(u8, self.headers, "\r\n");
         while (header_iter.next()) |header| {
             var header_split = std.mem.splitSequence(u8, header, ": ");
@@ -45,7 +45,7 @@ pub const Request = struct {
     }
 
     // Get request's "User-Agent" header.
-    pub fn get_user_agent(self: *Self) ?[]const u8 {
-        return self.get_header("User-Agent");
+    pub fn getUserAgent(self: *Self) ?[]const u8 {
+        return self.getHeader("User-Agent");
     }
 };
