@@ -36,6 +36,15 @@ pub fn respond_ok_with_octet_and_body(body: []const u8, conn: net.Server.Connect
     ) catch respond_internal_error(conn);
 }
 
+/// Respond with "Content-Encoding: gzip" and "Content-Type: text/plain" (headers) and provided body.
+pub fn respond_ok_with_gzip_and_body(body: []const u8, conn: net.Server.Connection) void {
+    std.fmt.format(
+        conn.stream.writer(),
+        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n{s}",
+        .{ body.len, body },
+    ) catch respond_internal_error(conn);
+}
+
 /// Respond with Internal Server Error.
 pub fn respond_not_found(conn: net.Server.Connection) void {
     conn.stream.writeAll("HTTP/1.1 404 Not Found\r\n\r\n") catch return;

@@ -8,10 +8,11 @@ const respond_ok = responders.respond_ok;
 const respond_created = responders.respond_created;
 const respond_ok_with_body = responders.respond_ok_with_body;
 const respond_ok_with_octet_and_body = responders.respond_ok_with_octet_and_body;
+const respond_ok_with_gzip_and_body = responders.respond_ok_with_gzip_and_body;
 const respond_not_found = responders.respond_not_found;
 const respond_internal_error = responders.respond_internal_error;
 
-pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8, a: Allocator) void {
+pub fn handle_connection(conn: net.Server.Connection, files_directory: []const u8, a: Allocator) void {
     defer conn.stream.close();
 
     const buffer = a.alloc(u8, 512) catch return respond_internal_error(conn);
@@ -31,28 +32,46 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
     // skip the first '/' as there is nothing in front of it
     _ = route_iter.next();
 
+    //////////////////
+    // /echo/{word} //
+    //////////////////
     if (std.mem.eql(u8, route_iter.peek().?, "echo")) {
         _ = route_iter.next(); // skip what we peeked
-        if (route_iter.peek()) |part| {
-            respond_ok_with_body(part, conn);
+        if (route_iter.peek()) |word| {
+            if (req.get_header("Accept-Encoding")) |encoding| {
+                if (std.mem.eql(u8, encoding, "gzip")) {
+                    return respond_ok_with_gzip_and_body(word, conn);
+                }
+            }
+            respond_ok_with_body(word, conn);
         } else {
             respond_not_found(conn);
         }
-    } else if (std.mem.eql(u8, route_iter.peek().?, "user-agent")) {
+    }
+
+    /////////////////
+    // /user-agent //
+    /////////////////
+    else if (std.mem.eql(u8, route_iter.peek().?, "user-agent")) {
         _ = route_iter.next(); // skip what we peeked
         respond_ok_with_body(req.get_user_agent().?, conn);
-    } else if (std.mem.eql(u8, route_iter.peek().?, "files")) {
+    }
+
+    ////////////
+    // /files //
+    ////////////
+    else if (std.mem.eql(u8, route_iter.peek().?, "files")) {
         log("Got {s} request to /files.\n", .{req.get_method()});
         _ = route_iter.next(); // skip what we peeked, a: []const T, b: []const T))
-        if (route_iter.peek()) |part| {
-            const filepath = std.fmt.allocPrint(a, "{s}/{s}", .{ files_directory, part }) catch |err| {
+        if (route_iter.peek()) |filename| {
+            const filepath = std.fmt.allocPrint(a, "{s}/{s}", .{ files_directory, filename }) catch |err| {
                 log("Error appending slices for filepath: {any}", .{err});
                 respond_internal_error(conn);
                 return;
             };
             if (std.mem.eql(u8, req.get_method(), "GET")) {
                 log("Looking for '{s}' file to read from ...\n", .{filepath});
-                const content = getFileContent(filepath, a) catch |err| {
+                const content = get_file_contents_size(filepath, a) catch |err| {
                     log(">>> Err: {any}", .{err});
                     if (err == error.FileNotFound) {
                         return respond_not_found(conn);
@@ -73,7 +92,7 @@ pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8
     log("HTTP response sent\n", .{});
 }
 
-fn getFileContent(filename: []u8, a: Allocator) ![]u8 {
+fn get_file_contents_size(filename: []u8, a: Allocator) ![]u8 {
     const file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
     defer file.close();
     const file_size = (try file.stat()).size;

@@ -27,6 +27,8 @@ Notes: I had to use zig 0.12 due to an external limitation.
 
 ## Usage
 
+### Get / and /echo
+
 To access the root (`/`) and `/echo` routes, use:
 
 ```bash
@@ -34,11 +36,17 @@ curl -i http://localhost:4221/              # responds with OK (HTTP 200)
 curl -i http://localhost:4221/echo/abc      # responds with OK (HTTP 200) and body: abc
 ```
 
+On `/echo`, if you send `Accept-Encoding: gzip` header, the response will consider it (include `Content-Encoding: gzip` header).
+
+### Get /user-agent
+
 To access `/user-agent` GET API operation that returns the `User-Agent` header provided in the request, use:
 
 ```bash
 curl --header "User-Agent: foobar/1.2.3" http://localhost:4221/user-agent  # responds with OK (HTTP 200) and body: foobar/1.2.3
 ```
+
+### Files - Get & Post
 
 To serve files:
 
