@@ -12,7 +12,7 @@ const respond_ok_with_gzip_and_body = responders.respond_ok_with_gzip_and_body;
 const respond_not_found = responders.respond_not_found;
 const respond_internal_error = responders.respond_internal_error;
 
-pub fn handle_connection(conn: net.Server.Connection, files_directory: []const u8, a: Allocator) void {
+pub fn handleConnection(conn: net.Server.Connection, files_directory: []const u8, a: Allocator) void {
     defer conn.stream.close();
 
     const buffer = a.alloc(u8, 512) catch return respond_internal_error(conn);
