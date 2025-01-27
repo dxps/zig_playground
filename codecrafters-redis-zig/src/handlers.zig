@@ -14,15 +14,15 @@ const CommandName = @import("command.zig").CommandName;
 
 var store: std.StringHashMap([]const u8) = undefined;
 
-pub fn initStore() void {
-    store = std.StringHashMap([]const u8).init(std.heap.page_allocator);
+pub fn initStore(a: Allocator) void {
+    store = std.StringHashMap([]const u8).init(a);
 }
 
-pub fn handleConnection(conn: net.Server.Connection, alloc: Allocator) void {
+pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
     defer conn.stream.close();
 
-    const input = alloc.alloc(u8, 512) catch return respondError(conn);
-    defer alloc.free(input);
+    const input = a.alloc(u8, 512) catch return respondError(conn);
+    defer a.free(input);
 
     while (true) {
         const data_len = conn.stream.read(input) catch return respondError(conn);
@@ -56,7 +56,7 @@ pub fn handleConnection(conn: net.Server.Connection, alloc: Allocator) void {
         // SET //
         /////////
         else if (cmd.name == CommandName.SET) {
-            return handleSet(conn, cmd);
+            return handleSet(a, conn, cmd);
         }
 
         /////////
@@ -77,11 +77,20 @@ fn handleEcho(conn: net.Server.Connection, cmd: Command) void {
     ) catch respondError(conn);
 }
 
-fn handleSet(conn: net.Server.Connection, cmd: Command) void {
+fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) void {
     const key = cmd.payload[0];
     const value = cmd.payload[1];
 
-    store.put(key, value) catch |err| {
+    const key_copy = std.mem.Allocator.dupe(a, u8, cmd.payload[0]) catch |err| {
+        log("Failed to duplicate key='{s}': '{any}'.\n", .{ key, err });
+        return respondError(conn);
+    };
+    const value_copy = std.mem.Allocator.dupe(a, u8, cmd.payload[1]) catch |err| {
+        log("Failed to duplicate value='{s}': '{any}'.\n", .{ value, err });
+        return respondError(conn);
+    };
+
+    store.put(key_copy, value_copy) catch |err| {
         log("Failed to set key='{s}' value='{s}': '{any}'.\n", .{ key, value, err });
         return respondError(conn);
     };

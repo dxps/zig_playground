@@ -5,7 +5,7 @@ tmp_dir = ".air-tmp"
 [build]
   args_bin = []
   bin = "./zig-out/bin/main"
-  cmd = "zig-0.13 build -freference-trace=13"
+  cmd = "zig-0.13 build -freference-trace=30"
   delay = 1000
   exclude_dir = [ ".zig-cache", "zig-cache", "zig-out" ]
   exclude_file = []

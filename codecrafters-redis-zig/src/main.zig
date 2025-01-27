@@ -11,8 +11,11 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     initLog(stdout);
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const a = gpa.allocator();
+
     // Store init.
-    initStore();
+    initStore(a);
 
     // Start the server.
     try runServer();
