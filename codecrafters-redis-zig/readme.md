@@ -19,3 +19,5 @@ event loops, the Redis protocol and more.
 
 1. `PING` use case:
     1. Use `redis-cli PING` or `echo -e "PING\nPING" | redis-cli`
+2. `ECHO` use case:
+    1. Use `redis-cli ECHO "Hello World!"`
