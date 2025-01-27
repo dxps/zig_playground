@@ -2,6 +2,7 @@ const std = @import("std");
 const net = std.net;
 const handleConnection = @import("handlers.zig").handleConnection;
 const initLog = @import("log.zig").initLog;
+const initStore = @import("handlers.zig").initStore;
 const log = @import("log.zig").log;
 
 pub fn main() !void {
@@ -9,6 +10,9 @@ pub fn main() !void {
     // Logging init.
     const stdout = std.io.getStdOut().writer();
     initLog(stdout);
+
+    // Store init.
+    initStore();
 
     // Start the server.
     try runServer();

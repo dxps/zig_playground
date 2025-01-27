@@ -27,7 +27,7 @@ pub const Command = struct {
 
         if (std.mem.startsWith(u8, first_line, "*")) { // It's an array.
 
-            const payload_size = try std.fmt.parseUnsigned(u8, first_line[1..], 10);
+            const payload_size = try std.fmt.parseUnsigned(u8, first_line[1..], 10) - 1; // Ignore the first "data line" that is the command name.
             _ = input_iter.next(); // Skip the length line (that "${number}" line).
             const name = input_iter.next().?;
             const case = std.meta.stringToEnum(CommandName, name) orelse return error.InvalidCommand;
@@ -44,7 +44,30 @@ pub const Command = struct {
                     try payload.append(item);
                     return Command{
                         .name = .ECHO,
-                        .payload_size = payload_size, // Skip the first item, which is the command name.
+                        .payload_size = payload_size,
+                        .payload = payload.items,
+                    };
+                },
+                .SET => {
+                    _ = input_iter.next();
+                    const key = input_iter.next().?;
+                    _ = input_iter.next();
+                    const value = input_iter.next().?;
+                    try payload.append(key);
+                    try payload.append(value);
+                    return Command{
+                        .name = .SET,
+                        .payload_size = payload_size,
+                        .payload = payload.items,
+                    };
+                },
+                .GET => {
+                    _ = input_iter.next();
+                    const key = input_iter.next().?;
+                    try payload.append(key);
+                    return Command{
+                        .name = .GET,
+                        .payload_size = payload_size,
                         .payload = payload.items,
                     };
                 },
@@ -58,4 +81,6 @@ pub const Command = struct {
 pub const CommandName = enum {
     PING,
     ECHO,
+    SET,
+    GET,
 };
