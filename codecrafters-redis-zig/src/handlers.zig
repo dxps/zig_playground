@@ -13,9 +13,11 @@ const Command = @import("command.zig").Command;
 const CommandName = @import("command.zig").CommandName;
 
 var store: std.StringHashMap([]const u8) = undefined;
+var store_mutex: std.Thread.Mutex = undefined;
 
 pub fn initStore(a: Allocator) void {
     store = std.StringHashMap([]const u8).init(a);
+    store_mutex = std.Thread.Mutex{};
 }
 
 pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
@@ -56,14 +58,14 @@ pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
         // SET //
         /////////
         else if (cmd.name == CommandName.SET) {
-            return handleSet(a, conn, cmd);
+            handleSet(a, conn, cmd);
         }
 
         /////////
         // GET //
         /////////
         else if (cmd.name == CommandName.GET) {
-            return handleGet(conn, cmd);
+            handleGet(conn, cmd);
         }
     }
 }
@@ -90,18 +92,14 @@ fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) void {
         return respondError(conn);
     };
 
+    store_mutex.lock();
+    defer store_mutex.unlock();
+
     store.put(key_copy, value_copy) catch |err| {
-        log("Failed to set key='{s}' value='{s}': '{any}'.\n", .{ key, value, err });
+        log("Failed to set key='{s}' value='{s}': '{any}'.\n", .{ key_copy, value_copy, err });
         return respondError(conn);
     };
-    log("Set key='{s}' value='{s}'.\n", .{ key, value });
-
-    // Testing back (the result).
-    if (store.get(key)) |val| {
-        log("Testing back: got value='{s}' for key='{s}'.\n", .{ val, key });
-    } else {
-        log("Testing back: got nothing for key='{s}'.\n", .{key});
-    }
+    log("Set key='{s}' value='{s}'.\n", .{ key_copy, value_copy });
 
     respondOk(conn);
 }
@@ -109,6 +107,10 @@ fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) void {
 fn handleGet(conn: net.Server.Connection, cmd: Command) void {
     const key = cmd.payload[0];
     log("Looking for key='{s}' ...\n", .{key});
+
+    store_mutex.lock();
+    defer store_mutex.unlock();
+
     if (store.get(key)) |value| {
         log("Got value='{s}' for key='{s}'.\n", .{ value, key });
         respondSimpleString(conn, value);
