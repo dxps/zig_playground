@@ -2,22 +2,25 @@ const std = @import("std");
 const net = std.net;
 const Allocator = std.mem.Allocator;
 const log = @import("log.zig").log;
+const Store = @import("datastore.zig").Store;
 const responders = @import("responders.zig");
 const respondPong = responders.respondPong;
 const respondError = responders.respondError;
 const respondToEcho = responders.respondToEcho;
 const respondNullBulkString = responders.respondNullBulkString;
 const respondSimpleString = responders.respondSimpleString;
+const respondCommandError = responders.respondCommandError;
 const respondOk = responders.respondOk;
 const Command = @import("command.zig").Command;
 const CommandName = @import("command.zig").CommandName;
 
-var store: std.StringHashMap([]const u8) = undefined;
-var store_mutex: std.Thread.Mutex = undefined;
+// var store: std.StringHashMap([]const u8) = undefined;
+// var store_mutex: std.Thread.Mutex = undefined;
+
+var store: Store = undefined;
 
 pub fn initStore(a: Allocator) void {
-    store = std.StringHashMap([]const u8).init(a);
-    store_mutex = std.Thread.Mutex{};
+    store = Store.init(a);
 }
 
 pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
@@ -58,7 +61,11 @@ pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
         // SET //
         /////////
         else if (cmd.name == CommandName.SET) {
-            handleSet(a, conn, cmd);
+            handleSet(a, conn, cmd) catch |err| {
+                const err_msg = std.fmt.allocPrint(a, "{any}", .{err}) catch unreachable;
+                respondCommandError(conn, err_msg);
+                // respondCommandError(conn, try std.fmt.allocPrint(a, "{any}", .{err}));
+            };
         }
 
         /////////
@@ -79,7 +86,7 @@ fn handleEcho(conn: net.Server.Connection, cmd: Command) void {
     ) catch respondError(conn);
 }
 
-fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) void {
+fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) !void {
     const key = cmd.payload[0];
     const value = cmd.payload[1];
 
@@ -92,13 +99,17 @@ fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) void {
         return respondError(conn);
     };
 
-    store_mutex.lock();
-    defer store_mutex.unlock();
+    // const expires = if (cmd.payload_size == 4 and std.mem.eql(u8, cmd.payload[2], "px")) {
+    var expires: i64 = 0;
+    if (cmd.payload_size == 4 and std.mem.eql(u8, cmd.payload[2], "px")) {
+        expires = try std.fmt.parseUnsigned(i64, cmd.payload[3], 10);
+    }
 
-    store.put(key_copy, value_copy) catch |err| {
+    store.put(key_copy, value_copy, expires) catch |err| {
         log("Failed to set key='{s}' value='{s}': '{any}'.\n", .{ key_copy, value_copy, err });
         return respondError(conn);
     };
+
     log("Set key='{s}' value='{s}'.\n", .{ key_copy, value_copy });
 
     respondOk(conn);
@@ -108,26 +119,10 @@ fn handleGet(conn: net.Server.Connection, cmd: Command) void {
     const key = cmd.payload[0];
     log("Looking for key='{s}' ...\n", .{key});
 
-    store_mutex.lock();
-    defer store_mutex.unlock();
-
     if (store.get(key)) |value| {
         log("Got value='{s}' for key='{s}'.\n", .{ value, key });
         respondSimpleString(conn, value);
     } else {
         respondNullBulkString(conn);
     }
-}
-
-test "string hashmap" {
-    const expect = std.testing.expect;
-
-    var map = std.StringHashMap([]const u8).init(std.heap.page_allocator);
-    defer map.deinit();
-
-    try map.put("loris", "uncool");
-    try map.put("me", "cool");
-
-    try expect(std.mem.eql(u8, map.get("me").?, "cool"));
-    try expect(std.mem.eql(u8, map.get("loris").?, "uncool"));
 }

@@ -4,6 +4,7 @@ const handleConnection = @import("handlers.zig").handleConnection;
 const initLog = @import("log.zig").initLog;
 const initStore = @import("handlers.zig").initStore;
 const log = @import("log.zig").log;
+const Store = @import("datastore.zig").Store;
 
 pub fn main() !void {
 
@@ -14,7 +15,6 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const a = gpa.allocator();
 
-    // Store init.
     initStore(a);
 
     // Start the server.

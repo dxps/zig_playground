@@ -55,6 +55,12 @@ pub const Command = struct {
                     const value = input_iter.next().?;
                     try payload.append(key);
                     try payload.append(value);
+                    if (payload_size == 4) {
+                        _ = input_iter.next(); // Skip the (next line's) size line.
+                        try payload.append(input_iter.next().?); // This should be "px"
+                        _ = input_iter.next(); // Skip the (next line's) size line.
+                        try payload.append(input_iter.next().?); // This should be the expiration time.
+                    }
                     return Command{
                         .name = .SET,
                         .payload_size = payload_size,
