@@ -25,7 +25,7 @@
     .dependencies = .{
         .zinc = .{
             .url = "https://github.com/zon-dev/zinc/archive/refs/heads/main.zip",
-            .hash = "1220a81e9421f9185fff79baba4beace2b8d9b4ec625ae3b0e06c3f3999993e87475",
+            .hash = "122038b8c6f3ce712fba7014b9d333af28d7d461c5c712ea9fa15f99532a89b28086",
         },
     },
     .paths = .{
