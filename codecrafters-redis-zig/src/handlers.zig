@@ -9,18 +9,16 @@ const respondError = responders.respondError;
 const respondToEcho = responders.respondToEcho;
 const respondNullBulkString = responders.respondNullBulkString;
 const respondSimpleString = responders.respondSimpleString;
+const respondArray = responders.respondArray;
 const respondCommandError = responders.respondCommandError;
 const respondOk = responders.respondOk;
 const Command = @import("command.zig").Command;
 const CommandName = @import("command.zig").CommandName;
 
-// var store: std.StringHashMap([]const u8) = undefined;
-// var store_mutex: std.Thread.Mutex = undefined;
-
 var store: Store = undefined;
 
-pub fn initStore(a: Allocator) void {
-    store = Store.init(a);
+pub fn initStore(a: Allocator, dir: []const u8, dbfilename: []const u8) void {
+    store = Store.init(a, dir, dbfilename);
 }
 
 pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
@@ -64,7 +62,6 @@ pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
             handleSet(a, conn, cmd) catch |err| {
                 const err_msg = std.fmt.allocPrint(a, "{any}", .{err}) catch unreachable;
                 respondCommandError(conn, err_msg);
-                // respondCommandError(conn, try std.fmt.allocPrint(a, "{any}", .{err}));
             };
         }
 
@@ -73,6 +70,13 @@ pub fn handleConnection(conn: net.Server.Connection, a: Allocator) void {
         /////////
         else if (cmd.name == CommandName.GET) {
             handleGet(conn, cmd);
+        }
+
+        ////////////
+        // CONFIG //
+        ////////////
+        else if (cmd.name == CommandName.CONFIG) {
+            handleConfig(conn, cmd);
         }
     }
 }
@@ -99,7 +103,6 @@ fn handleSet(a: Allocator, conn: net.Server.Connection, cmd: Command) !void {
         return respondError(conn);
     };
 
-    // const expires = if (cmd.payload_size == 4 and std.mem.eql(u8, cmd.payload[2], "px")) {
     var expires: i64 = 0;
     if (cmd.payload_size == 4 and std.mem.eql(u8, cmd.payload[2], "px")) {
         expires = try std.fmt.parseUnsigned(i64, cmd.payload[3], 10);
@@ -124,5 +127,20 @@ fn handleGet(conn: net.Server.Connection, cmd: Command) void {
         respondSimpleString(conn, value);
     } else {
         respondNullBulkString(conn);
+    }
+}
+
+fn handleConfig(conn: net.Server.Connection, cmd: Command) void {
+    const parameter = cmd.payload[1];
+    if (std.mem.eql(u8, parameter, "dir")) {
+        // respondSimpleString(conn, "dir");
+        // respondSimpleString(conn, store.dir);
+        const response = [2][]const u8{ "dir", store.dir };
+        const resp_slice = response[0..];
+        respondArray(conn, resp_slice);
+    } else if (std.mem.eql(u8, parameter, "dbfilename")) {
+        respondSimpleString(conn, store.dbfilename);
+    } else {
+        respondCommandError(conn, "Unknown parameter.");
     }
 }

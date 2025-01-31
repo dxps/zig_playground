@@ -57,7 +57,7 @@ pub const Command = struct {
                     try payload.append(value);
                     if (payload_size == 4) {
                         _ = input_iter.next(); // Skip the (next line's) size line.
-                        try payload.append(input_iter.next().?); // This should be "px"
+                        try payload.append(input_iter.next().?); // This should be "px".
                         _ = input_iter.next(); // Skip the (next line's) size line.
                         try payload.append(input_iter.next().?); // This should be the expiration time.
                     }
@@ -77,6 +77,17 @@ pub const Command = struct {
                         .payload = payload.items,
                     };
                 },
+                .CONFIG => {
+                    _ = input_iter.next();
+                    try payload.append(input_iter.next().?); // This should be "GET".
+                    _ = input_iter.next(); // Skip the (next line's) size line.
+                    try payload.append(input_iter.next().?); // This should be the parameter (such as dir or dbfilename).
+                    return Command{
+                        .name = .CONFIG,
+                        .payload_size = payload_size,
+                        .payload = payload.items,
+                    };
+                },
             }
         }
 
@@ -89,4 +100,5 @@ pub const CommandName = enum {
     ECHO,
     SET,
     GET,
+    CONFIG,
 };

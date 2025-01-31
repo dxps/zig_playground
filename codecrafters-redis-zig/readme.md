@@ -26,3 +26,7 @@ event loops, the Redis protocol and more.
     2. Use `redis-cli SET foo bar px 2000` to set a key with a TTL (expires in two seconds).
 4. `GET` use case:
     1. Use `redis-cli GET foo`
+5. `CONFIG GET` use case:
+    1. Use `redis-cli CONFIG GET dir` or `redis-cli CONFIG GET dbfilename` to get these two configuration parameters.
+    2. These configuration parameters can be set at program startup time using:
+       `./your_program.sh --dir=/tmp/somepath --dbfilename=somefilename`

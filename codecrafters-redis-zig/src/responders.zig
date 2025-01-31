@@ -17,6 +17,15 @@ pub fn respondSimpleString(conn: net.Server.Connection, content: []const u8) voi
     std.fmt.format(conn.stream.writer(), "${}\r\n{s}\r\n", .{ content.len, content }) catch respondError(conn);
 }
 
+/// Respond with an array of simple strings.
+/// TODO: Make it more generic (not expect just 2 items)
+pub fn respondArray(conn: net.Server.Connection, items: *const [2][]const u8) void {
+    std.fmt.format(conn.stream.writer(), "*{}\r\n", .{items.len}) catch respondError(conn);
+    for (items) |item| {
+        std.fmt.format(conn.stream.writer(), "${}\r\n{s}\r\n", .{ item.len, item }) catch respondError(conn);
+    }
+}
+
 /// Respond with error.
 pub fn respondError(conn: net.Server.Connection) void {
     conn.stream.writeAll("Failed to process the request") catch return;
