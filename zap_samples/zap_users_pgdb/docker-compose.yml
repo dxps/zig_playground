@@ -1,0 +1,10 @@
+services:
+    postgres:
+        image: postgres:16
+        container_name: zig_samples
+        environment:
+            POSTGRES_USER: zig
+            POSTGRES_PASSWORD: cool
+            POSTGRES_DB: zig_samples
+        ports:
+            - '5456:5432'
