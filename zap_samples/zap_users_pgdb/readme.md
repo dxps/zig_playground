@@ -34,9 +34,9 @@ _to be cont'd_
 
 1. Currently, with existing Zig version `0.14.0-dev.3020`, the server crashes on any request, details shown below. Instead of trying with Zig version `0.13.0`, I'll wait a bit for the release of Zig 0.14.0, planned for this month, Feb '25.
 
-    <details>
-        <summary>Crash (panic) details</summary>
-        ```
+ <details>
+     <summary>Crash (panic) details</summary>
+     <pre>
         thread 864049 panic: incorrect alignment
         /home/dxps/apps/zig/0.14.0-dev.3020+c104e8644/files/lib/std/hash_map.zig:775:44: 0x11336b7 in header (zap_users_pgdb)
                     return @ptrCast(@as([*]Header, @ptrCast(@alignCast(self.metadata.?))) - 1);
@@ -61,7 +61,7 @@ _to be cont'd_
                             ^
         /home/dxps/.cache/zig/p/12200223d76ab6cd32f75bc2e31463b0b429bb5b2b6fa4ce8f68dea494ca1ec3398b/src/router.zig:98:17: 0x109d432 in zap_on_request (zap_users_pgdb)
             return serve(_instance, r);
-        ```
-    </details><br/>
+     </pre>
+ </details><br/>
 
 2. Use multiple threads and workers in zap, and everything that must be done to support this.
