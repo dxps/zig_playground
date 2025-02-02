@@ -53,7 +53,10 @@ pub const HttpServer = struct {
         try self.listener.listen();
         log("Listening on 0.0.0.0:{d} ...\n", .{self.listener_port});
 
-        zap.start(.{ .threads = 1, .workers = 1 });
+        zap.start(.{
+            .threads = 1,
+            .workers = 1,
+        });
     }
 };
 
