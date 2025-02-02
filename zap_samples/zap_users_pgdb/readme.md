@@ -28,7 +28,7 @@ _to be cont'd_
 
 1. Currently, with existing Zig version `0.14.0-dev.3020`, the server crashes on any request, crash details below.
 
-    1. Instead of trying with Zig version `0.13.0`, I'll wait a bit for the release of Zig 0.14.0, planned for this month, Feb '25.
+    1. Instead of trying with Zig version `0.13.0`, I'll wait a bit for Zig `0.14.0`, planned for to be released this month, Feb '25.
     2. <details>
             <summary>Crash (panic) details</summary>
             <pre>
