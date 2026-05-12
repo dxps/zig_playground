@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="/webui.js"></script>
+  <title>Zig WebUI SPA</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      display: grid;
+      min-height: 100vh;
+      margin: 0;
+      place-items: center;
+      background: #f4f7f9;
+      color: #172026;
+    }
+    .app {
+      width: min(44rem, calc(100vw - 2rem));
+    }
+    nav {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    a {
+      padding: 0.625rem 0.875rem;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: inherit;
+      text-decoration: none;
+    }
+    a[aria-current="page"] {
+      border-color: #246b60;
+      background: #dff3ef;
+    }
+    main {
+      min-height: 15rem;
+      padding: 2rem;
+      border: 1px solid #ccd6dd;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 18px 42px rgb(23 32 38 / 12%);
+    }
+    h1 {
+      margin: 0 0 0.75rem;
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+    p {
+      margin: 0 0 1rem;
+      line-height: 1.55;
+    }
+    dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 0.625rem 1rem;
+      margin: 0;
+    }
+    dt {
+      font-weight: 700;
+    }
+    dd {
+      margin: 0;
+    }
+    code {
+      font: 0.95em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav aria-label="Primary">
+      <a href="/" data-route>Home</a>
+      <a href="/data" data-route>Data</a>
+    </nav>
+    <main id="app" tabindex="-1"></main>
+  </div>
+  <script>
+    const views = {
+      "/": {
+        title: "Hello from Zig WebUI",
+        body: `<p>This is the Home view. The page is served by Zig, then routed in the browser like a tiny SPA.</p>
+               <p>Use the navigation above or open <code>/data</code> directly.</p>`
+      },
+      "/data": {
+        title: "Data",
+        body: `<p>This Data view is available at <code>/data</code> and can be refreshed directly.</p>
+               <dl>
+                 <dt>Runtime</dt><dd>zig-webui</dd>
+                 <dt>Routing</dt><dd>History API</dd>
+                 <dt>Server</dt><dd>Zig WebUI HTTP server</dd>
+               </dl>`
+      }
+    };
+
+    function normalizePath(path) {
+      return Object.prototype.hasOwnProperty.call(views, path) ? path : "/";
+    }
+
+    function render(path) {
+      const route = normalizePath(path);
+      const view = views[route];
+      document.title = `${view.title} - Zig WebUI SPA`;
+      document.getElementById("app").innerHTML = `<h1>${view.title}</h1>${view.body}`;
+      document.querySelectorAll("[data-route]").forEach((link) => {
+        link.setAttribute("aria-current", link.pathname === route ? "page" : "false");
+      });
+    }
+
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest("[data-route]");
+      if (!link) return;
+      event.preventDefault();
+      history.pushState(null, "", link.pathname);
+      render(location.pathname);
+    });
+
+    addEventListener("popstate", () => render(location.pathname));
+    render(location.pathname);
+  </script>
+</body>
+</html>
