@@ -1,0 +1,453 @@
+const std = @import("std");
+const Io = std.Io;
+const Allocator = std.mem.Allocator;
+
+pub const FilterId = enum(u128) {
+    all = 0,
+    _,
+    pub fn fromInt(value: anytype) FilterId {
+        return @enumFromInt(@as(u128, value));
+    }
+
+    // Allow the user to apply strings if they really want,
+    // in which case we just use the u128 hash of the string
+    pub fn fromSlice(slice: []const u8) FilterId {
+        if (std.mem.eql(u8, slice, "all")) return .all;
+        const hash = std.hash.Fnv1a_128.hash(slice);
+        return @enumFromInt(hash);
+    }
+};
+
+pub fn PubSub(comptime UserPayload: type) type {
+    const Topic = std.meta.Tag(UserPayload);
+    const TopicCount = std.meta.fields(Topic).len;
+
+    return struct {
+        io: Io,
+        allocator: Allocator,
+        registry: [TopicCount]std.ArrayList(*Subscriber) = undefined,
+        locks: [TopicCount]Io.RwLock = undefined,
+        paused: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        running: std.atomic.Value(bool) = std.atomic.Value(bool).init(true),
+        mutex: Io.Mutex = .init,
+
+        const Self = @This();
+
+        const RcEnvelope = struct {
+            ref_count: std.atomic.Value(usize),
+            arena: std.heap.ArenaAllocator,
+            filter_id: FilterId,
+
+            pub fn release(self: *@This(), parent_alloc: Allocator) void {
+                if (self.ref_count.fetchSub(1, .acq_rel) == 1) {
+                    var arena = self.arena;
+                    arena.deinit();
+                    parent_alloc.destroy(self);
+                }
+            }
+        };
+
+        const QueueItem = struct {
+            payload: UserPayload,
+            envelope: ?*RcEnvelope,
+        };
+
+        const QueueNode = union(enum) {
+            data: QueueItem,
+            quit: void,
+        };
+
+        // --------------------------------------------------------
+        // Public Types
+        // --------------------------------------------------------
+
+        pub const Message = struct {
+            envelope: ?*RcEnvelope,
+            payload: UserPayload,
+            topic: Topic,
+            filter_id: FilterId,
+            subscriber: *Subscriber,
+
+            pub fn deinit(self: @This(), allocator: Allocator) void {
+                self.subscriber.manualRelease(self.envelope, allocator);
+            }
+        };
+
+        pub const Event = union(enum) {
+            msg: Message,
+            timeout: void,
+
+            pub fn format(
+                self: Event,
+                writer: anytype,
+            ) !void {
+                switch (self) {
+                    .msg => |m| try writer.print("msg(topic: {any})", .{m.topic}),
+                    .timeout => try writer.writeAll("timeout"),
+                }
+            }
+        };
+
+        pub const Subscriber = struct {
+            allocator: Allocator,
+            io: Io,
+            parent: *Self,
+            queue: std.Deque(QueueNode),
+            mutex: Io.Mutex = .init,
+            new_message: Io.Event = .unset,
+            cond: Io.Condition = .init,
+            subscriptions: std.ArrayList(Topic) = .empty,
+            filter_id: std.atomic.Value(u128) = std.atomic.Value(u128).init(@intFromEnum(FilterId.all)),
+            active_envelope: ?*RcEnvelope = null,
+
+            pub fn init(allocator: Allocator, io: Io, parent: *Self) !Subscriber {
+                return .{
+                    .allocator = allocator,
+                    .io = io,
+                    .parent = parent,
+                    .queue = try std.Deque(QueueNode).initCapacity(allocator, 1024),
+                };
+            }
+
+            pub fn deinit(self: *Subscriber) void {
+                // if the schema has only 1 entry then sizeof topic is 0
+                if (@sizeOf(Topic) == 0) {
+                    const count = self.subscriptions.items.len;
+                    var i: usize = 0;
+                    while (i < count) : (i += 1) {
+                        // Since there's only one topic, index is always 0
+                        self.parent.unsubscribeRaw(@enumFromInt(0), self);
+                    }
+                } else {
+                    for (self.subscriptions.items) |topic| {
+                        self.parent.unsubscribeRaw(topic, self);
+                    }
+                }
+
+                if (self.active_envelope) |env| {
+                    env.release(self.allocator);
+                    self.active_envelope = null;
+                }
+
+                //    This prevents race conditions with Shutdown() calling sub.close()
+                self.mutex.lockUncancelable(self.io);
+                while (self.queue.popFront()) |item| {
+                    switch (item) {
+                        .data => |d| if (d.envelope) |e| e.release(self.allocator),
+                        else => {},
+                    }
+                }
+                self.mutex.unlock(self.io); // Unlock before destroying the queue
+
+                if (@sizeOf(Topic) != 0) {
+                    self.subscriptions.deinit(self.allocator);
+                }
+                self.queue.deinit(self.allocator);
+            }
+
+            pub fn manualRelease(self: *Subscriber, env_ptr: ?*RcEnvelope, alloc: Allocator) void {
+                const e = env_ptr orelse return;
+                self.mutex.lock(self.io) catch return;
+                defer self.mutex.unlock();
+                if (self.active_envelope == e) {
+                    self.active_envelope = null;
+                    e.release(alloc);
+                }
+            }
+
+            pub fn close(self: *Subscriber) void {
+                // Inject the special .quit signal locally
+                self.push(.quit) catch {};
+            }
+
+            pub fn next(self: *Subscriber) !?Event {
+                return try self.nextRaw(.none);
+            }
+
+            pub fn nextTimeout(self: *Subscriber, d: Io.Duration) !?Event {
+                return try self.nextRaw(.{
+                    .duration = .{
+                        .clock = .awake,
+                        .raw = d,
+                    },
+                });
+            }
+
+            fn nextRaw(self: *Subscriber, t: Io.Timeout) !?Event {
+                if (self.active_envelope) |env| {
+                    env.release(self.allocator);
+                    self.active_envelope = null;
+                }
+
+                while (self.queue.len == 0) {
+                    defer self.new_message.reset();
+                    self.new_message.waitTimeout(self.io, t) catch return .{ .timeout = {} };
+                }
+
+                {
+                    self.mutex.lockUncancelable(self.io);
+                    defer self.mutex.unlock(self.io);
+                    const item = self.queue.popFront() orelse return error.UnexpectedEmpty;
+
+                    switch (item) {
+                        .data => |d| {
+                            if (d.envelope) |env| self.active_envelope = env;
+                            return Event{ .msg = Message{
+                                .envelope = d.envelope,
+                                .payload = d.payload,
+                                .topic = std.meta.activeTag(d.payload),
+                                .filter_id = if (d.envelope) |e| e.filter_id else .all,
+                                .subscriber = self,
+                            } };
+                        },
+                        .quit => return null,
+                    }
+                }
+            }
+
+            // when they sort out timers and cancellation, plug this back in as next()
+            pub fn nextWithTimer(self: *Subscriber) !?Event {
+                self.event_mutex.lockUncancelable(self.io);
+                defer self.event_mutex.unlock(self.io);
+
+                if (self.active_envelope) |env| {
+                    env.release(self.allocator);
+                    self.active_envelope = null;
+                }
+
+                const SelectTypes = union(enum) {
+                    condition_wait: error{Canceled}!void,
+                    timeout: error{Canceled}!void,
+                };
+
+                var buffer: [2]SelectTypes = undefined;
+
+                while (self.queue.len == 0) {
+                    var select = Io.Select(SelectTypes).init(self.io, &buffer);
+                    select.async(.condition_wait, Io.Condition.wait, .{
+                        &self.cond,
+                        self.io,
+                        &self.event_mutex,
+                    });
+                    if (self.timeout) |timeout| {
+                        select.async(.timeout, Io.Clock.Duration.sleep, .{
+                            .{ .raw = timeout, .clock = .awake },
+                            self.io,
+                        });
+                    }
+
+                    // This will block until either the signal hits or the timer fires
+                    const result = select.await() catch continue;
+                    select.cancel(); // needed if timeout wins, we need to unlock the condition
+
+                    switch (result) {
+                        .condition_wait => |res| try res,
+                        .timeout => |res| {
+                            try res;
+                            return Event{ .timeout = {} }; // Return a timeout event to the consumer
+                        },
+                    }
+                }
+
+                {
+                    self.mutex.lockUncancelable(self.io);
+                    defer self.mutex.unlock(self.io);
+                    const item = self.queue.popFront() orelse return error.UnexpectedEmpty;
+
+                    switch (item) {
+                        .data => |d| {
+                            if (d.envelope) |env| self.active_envelope = env;
+                            return Event{ .msg = Message{
+                                .envelope = d.envelope,
+                                .payload = d.payload,
+                                .topic = std.meta.activeTag(d.payload),
+                                .filter_id = if (d.envelope) |e| e.filter_id else .all,
+                                .subscriber = self,
+                            } };
+                        },
+                        .quit => return null,
+                    }
+                }
+            }
+
+            pub fn nextPayload(self: *Subscriber) !?UserPayload {
+                while (true) {
+                    const event = (try self.next()) orelse return null;
+                    switch (event) {
+                        .msg => |m| {
+                            defer m.deinit(self.allocator);
+                            return m.payload;
+                        },
+                        .timeout => continue,
+                    }
+                }
+            }
+
+            pub fn setFilter(self: *Subscriber, id: FilterId) void {
+                self.filter_id.store(@intFromEnum(id), .monotonic);
+            }
+
+            pub fn subscribe(self: *Subscriber, topic: Topic) !void {
+                const index = @intFromEnum(topic);
+                self.parent.locks[index].lockUncancelable(self.io);
+                defer self.parent.locks[index].unlock(self.io);
+                try self.parent.registry[index].append(self.parent.allocator, self);
+
+                // If the schema has only 1 entry, then sizeof schema is 0
+                if (@sizeOf(Topic) == 0) {
+                    self.subscriptions.items.len += 1;
+                } else {
+                    try self.subscriptions.append(self.allocator, topic);
+                }
+            }
+
+            pub fn push(self: *Subscriber, item: QueueNode) !void {
+                self.mutex.lockUncancelable(self.io);
+                defer self.mutex.unlock(self.io);
+                try self.queue.pushBack(self.allocator, item);
+                self.new_message.set(self.io);
+            }
+        };
+
+        pub fn init(io: Io, allocator: Allocator) Self {
+            var self = Self{ .io = io, .allocator = allocator };
+            inline for (0..TopicCount) |i| {
+                self.registry[i] = std.ArrayList(*Subscriber).empty;
+                self.locks[i] = std.Io.RwLock.init;
+            }
+            return self;
+        }
+
+        pub fn deinit(self: *Self) void {
+            inline for (0..TopicCount) |i| {
+                self.registry[i].deinit(self.allocator);
+            }
+        }
+
+        pub fn connect(self: *Self) !Subscriber {
+            return Subscriber.init(self.allocator, self.io, self);
+        }
+
+        pub fn togglePause(self: *Self) void {
+            _ = self.paused.swap(!self.paused.load(.acquire), .acq_rel);
+        }
+
+        pub fn sleep(self: *Self, delay: ?Io.Duration) void {
+            self.paused.store(true, .monotonic);
+            if (delay) |d| {
+                self.io.sleep(d, .awake) catch {};
+                self.paused.store(false, .monotonic);
+            }
+        }
+
+        pub fn pause(self: *Self) void {
+            self.paused.store(true, .monotonic);
+        }
+
+        pub fn unpause(self: *Self) void {
+            self.paused.store(false, .monotonic);
+        }
+
+        pub fn shutdown(self: *Self) void {
+            self.paused.store(true, .seq_cst);
+            self.running.store(false, .seq_cst);
+
+            inline for (0..TopicCount) |i| {
+                self.locks[i].lockSharedUncancelable(self.io);
+                defer self.locks[i].unlockShared(self.io);
+
+                for (self.registry[i].items) |sub| {
+                    sub.close();
+                }
+            }
+        }
+
+        pub fn isPaused(self: *Self) bool {
+            return self.paused.load(.monotonic);
+        }
+
+        pub fn isRunning(self: *Self) bool {
+            return self.running.load(.monotonic);
+        }
+
+        pub fn publish(self: *Self, payload: UserPayload, filter_id: FilterId) !void {
+            if (self.paused.load(.monotonic)) return;
+            // self.mutex.lockUncancelable(self.io);
+            // defer self.mutex.unlock(self.io);
+
+            const topic = std.meta.activeTag(payload);
+            const index = @intFromEnum(topic);
+
+            self.locks[index].lockSharedUncancelable(self.io);
+            defer self.locks[index].unlockShared(self.io);
+
+            const subs = self.registry[index].items;
+            if (subs.len == 0) return;
+
+            var target_count: usize = 0;
+            for (subs) |sub| {
+                const raw = sub.filter_id.load(.monotonic);
+                const sub_id: FilterId = @enumFromInt(raw);
+                if (filter_id == .all or sub_id == filter_id) {
+                    target_count += 1;
+                }
+            }
+            if (target_count == 0) return;
+
+            var envelope: ?*RcEnvelope = null;
+            var final_payload = payload;
+
+            const can_clone = @hasDecl(UserPayload, "clone");
+
+            var use_envelope = false;
+            if (@hasDecl(UserPayload, "needsClone")) {
+                use_envelope = payload.needsClone();
+            } else if (can_clone) {
+                use_envelope = true;
+            }
+
+            if (use_envelope) {
+                if (comptime !can_clone) {
+                    return error.PayloadMissingCloneMethod;
+                } else {
+                    const env = try self.allocator.create(RcEnvelope);
+                    errdefer self.allocator.destroy(env);
+
+                    env.arena = std.heap.ArenaAllocator.init(self.allocator);
+                    errdefer env.arena.deinit();
+
+                    final_payload = try payload.clone(env.arena.allocator());
+
+                    env.filter_id = filter_id;
+                    env.ref_count = std.atomic.Value(usize).init(target_count);
+                    envelope = env;
+                }
+            }
+
+            for (subs) |sub| {
+                const raw = sub.filter_id.load(.monotonic);
+                const sub_id: FilterId = @enumFromInt(raw);
+
+                if (filter_id == .all or sub_id == filter_id) {
+                    sub.push(.{ .data = .{ .payload = final_payload, .envelope = envelope } }) catch {
+                        if (envelope) |e| e.release(self.allocator);
+                    };
+                }
+            }
+        }
+
+        fn unsubscribeRaw(self: *Self, topic: Topic, sub: *Subscriber) void {
+            const index = @intFromEnum(topic);
+            self.locks[index].lockUncancelable(self.io);
+            defer self.locks[index].unlock(self.io);
+
+            var list = &self.registry[index];
+            for (list.items, 0..) |item, i| {
+                if (item == sub) {
+                    _ = list.swapRemove(i);
+                    break;
+                }
+            }
+        }
+    };
+}
