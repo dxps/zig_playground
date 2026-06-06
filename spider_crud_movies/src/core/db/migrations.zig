@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const spider = @import("spider");
 const db = spider.pg;
 
@@ -9,6 +10,10 @@ const Migration = struct {
 
 const MIGRATIONS = [_]Migration{
     // {{entry}}
+    .{
+        .version = "1780769939_create_movies",
+        .sql_file = @embedFile("./migrations/1780769939_create_movies.sql"),
+    },
 };
 
 fn extractUpSection(sql_file: []const u8) []const u8 {
@@ -21,21 +26,20 @@ fn extractUpSection(sql_file: []const u8) []const u8 {
     return sql_file[content_start .. content_start + end];
 }
 
-fn migrate(alloc: std.mem.Allocator) !void {
+pub fn migrate(alloc: std.mem.Allocator) !void {
     var arena = std.heap.ArenaAllocator.init(alloc);
     defer arena.deinit();
     const a = arena.allocator();
 
-    try db.queryExecute(void, a,
-        "CREATE TABLE IF NOT EXISTS schema_migrations (" ++
+    try db.queryExecute(void, a, "CREATE TABLE IF NOT EXISTS schema_migrations (" ++
         "version VARCHAR(255) NOT NULL PRIMARY KEY, " ++
-        "ran_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
-    );
+        "ran_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
 
     for (MIGRATIONS) |migration| {
         const MigrationCheck = struct { count: i32 };
         const checks = try db.query(
-            MigrationCheck, a,
+            MigrationCheck,
+            a,
             "SELECT COUNT(*) as count FROM schema_migrations WHERE version = $1",
             .{migration.version},
         );
@@ -46,7 +50,9 @@ fn migrate(alloc: std.mem.Allocator) !void {
                 try db.queryExecute(void, a, sql_z);
                 std.debug.print("MIGRATION: ran {s}\n", .{migration.version});
             }
-            try db.query(void, a,
+            try db.query(
+                void,
+                a,
                 "INSERT INTO schema_migrations (version) VALUES ($1)",
                 .{migration.version},
             );

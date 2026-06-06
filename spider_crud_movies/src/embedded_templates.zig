@@ -5,6 +5,12 @@
 pub const EmbeddedTemplates = struct {
 
     home_index: []const u8 = @embedFile("features/home/views/index.html"),
+    movies_page: []const u8 = @embedFile("features/movies/views/page.html"),
+    movies_index: []const u8 = @embedFile("features/movies/views/index.html"),
+    MoviesForm: []const u8 = @embedFile("features/movies/views/MoviesForm.html"),
+    MoviesEditForm: []const u8 = @embedFile("features/movies/views/MoviesEditForm.html"),
+    MoviesCard: []const u8 = @embedFile("features/movies/views/MoviesCard.html"),
+    MoviesList: []const u8 = @embedFile("features/movies/views/MoviesList.html"),
     layout: []const u8 = @embedFile("shared/templates/layout.html"),
     nav_bar: []const u8 = @embedFile("shared/templates/nav-bar.html"),
     side_bar: []const u8 = @embedFile("shared/templates/side-bar.html"),
