@@ -2,11 +2,11 @@
     .name = .spider_crud_movies,
     .version = "0.1.0",
     .fingerprint = 0xe75e5eb1f6e8cbb4,
-    .minimum_zig_version = "0.17.0-dev.667+0569f1f6a",
+    .minimum_zig_version = "0.17.0-dev.704+b8cb78023",
     .dependencies = .{
         .spider = .{
-            .url = "git+https://github.com/llllOllOOll/spider?ref=main#9361e0cd636829279b28ee6b9cd2dbdb1452ddd1",
-            .hash = "spider-0.6.4-P7cGrr2wrgDU7E5_2T5HaCn1_Ppbin1HBqD080Se1c98",
+            .url = "git+https://github.com/llllOllOOll/spider#027ff4af54231f7eff37a401938368f1a1b62f2e",
+            .hash = "spider-0.6.6-P7cGrqCwrgAoSeST-Ebyt5QWeIoHCdAQqX8xgUfYeAPH",
         },
     },
     .paths = .{

@@ -21,7 +21,10 @@ pub fn main(init: std.process.Init) !void {
     var server = spider.app(.{});
     defer server.deinit();
 
-    try migrations.migrate(allocator);
+    migrations.migrate(allocator) catch |err| {
+        std.debug.print("Failed to migrate database: {}\n", .{err});
+        return err;
+    };
 
     server
         .get("/", home.index)

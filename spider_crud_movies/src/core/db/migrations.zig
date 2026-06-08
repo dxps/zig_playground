@@ -47,7 +47,9 @@ pub fn migrate(alloc: std.mem.Allocator) !void {
             const up_sql = extractUpSection(migration.sql_file);
             if (up_sql.len > 0 and std.mem.trim(u8, up_sql, " \n\r\t").len > 0) {
                 const sql_z = try a.dupeSentinel(u8, up_sql, 0);
-                try db.queryExecute(void, a, sql_z);
+                db.queryExecute(void, a, sql_z) catch |err| {
+                    std.log.err("Failed to run db migration ver. {s} for statement: {s}. Error: {}\n", .{ migration.version, sql_z, err });
+                };
                 std.debug.print("MIGRATION: ran {s}\n", .{migration.version});
             }
             try db.query(
