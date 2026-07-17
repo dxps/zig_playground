@@ -1,0 +1,22 @@
+{
+	"min_interval_ms": 500,
+	"max_interval_ms": 2000,
+	"run_count": 10,
+	"output_file": "test_result.json",
+	"operations": [
+		{
+			"name": "get example",
+			"url": "https://example.com/",
+			"method": "GET",
+			"headers": [{ "name": "accept", "value": "text/html" }],
+			"expected_status": 200
+		},
+		{
+			"name": "missing page",
+			"url": "https://example.com/not-found",
+			"method": "GET",
+			"headers": [],
+			"expected_status": 404
+		}
+	]
+}

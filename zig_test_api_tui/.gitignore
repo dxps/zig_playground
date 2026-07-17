@@ -1,0 +1,5 @@
+/api-test-results.json
+/zig-out/
+/.zig-cache/
+
+/config.json
