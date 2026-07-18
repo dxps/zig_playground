@@ -117,6 +117,9 @@ pub fn build(b: *std.Build) void {
     // run step. Add further examples by repeating this small block with a new
     // source file and step name.
 
+    // ---------------------------------------------------------------------------
+    // Example: pointer_mutability
+
     const pointer_mutability_exe = b.addExecutable(.{
         .name = "pointer_mutability",
         .root_module = b.createModule(.{
@@ -136,24 +139,53 @@ pub fn build(b: *std.Build) void {
     run_pointer_mutability_cmd.step.dependOn(b.getInstallStep());
     run_pointer_mutability_cmd.addPassthruArgs();
 
-    const pointer_readonly_exe = b.addExecutable(.{
-        .name = "pointer_mutability",
+    // ---------------------------------------------------------------------------
+    // Example: pointer_immutable
+    // ---------------------------------------------------------------------------
+
+    const pointer_immutable_exe = b.addExecutable(.{
+        .name = "pointer_immutable",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/pointer_readonly.zig"),
+            .root_source_file = b.path("src/pointer_immutable.zig"),
             .target = target,
             .optimize = optimize,
         }),
     });
-    b.installArtifact(pointer_readonly_exe);
+    b.installArtifact(pointer_immutable_exe);
 
-    const pointer_readonly_step = b.step(
-        "run-pointer-readonly",
-        "Run the pointer readonly example",
+    const pointer_immutable_step = b.step(
+        "run-pointer-immutable",
+        "Run the immutable pointer example",
     );
-    const run_pointer_readonly_cmd = b.addRunArtifact(pointer_readonly_exe);
-    pointer_readonly_step.dependOn(&run_pointer_readonly_cmd.step);
-    run_pointer_readonly_cmd.step.dependOn(b.getInstallStep());
-    run_pointer_readonly_cmd.addPassthruArgs();
+    const run_pointer_immutable_cmd = b.addRunArtifact(pointer_immutable_exe);
+    pointer_immutable_step.dependOn(&run_pointer_immutable_cmd.step);
+    run_pointer_immutable_cmd.step.dependOn(b.getInstallStep());
+    run_pointer_immutable_cmd.addPassthruArgs();
+
+    // ---------------------------------------------------------------------------
+    // Example: slice_immutable
+    // ---------------------------------------------------------------------------
+
+    const slice_immutable_exe = b.addExecutable(.{
+        .name = "slice_immutable",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/slice_immutable.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(slice_immutable_exe);
+
+    const slice_immutable_step = b.step(
+        "run-slice-immutable",
+        "Run the immutable slice example",
+    );
+    const run_slice_immutable_cmd = b.addRunArtifact(slice_immutable_exe);
+    slice_immutable_step.dependOn(&run_slice_immutable_cmd.step);
+    run_slice_immutable_cmd.step.dependOn(b.getInstallStep());
+    run_slice_immutable_cmd.addPassthruArgs();
+
+    // ---------------------------------------------------------------------------
 
     // Creates an executable that will run `test` blocks from the provided module.
     // Here `mod` needs to define a target, which is why earlier we made sure to
@@ -180,6 +212,16 @@ pub fn build(b: *std.Build) void {
     });
     const run_pointer_mutability_tests = b.addRunArtifact(pointer_mutability_tests);
 
+    const pointer_immutable_tests = b.addTest(.{
+        .root_module = pointer_immutable_exe.root_module,
+    });
+    const run_pointer_immutable_tests = b.addRunArtifact(pointer_immutable_tests);
+
+    const slice_immutable_tests = b.addTest(.{
+        .root_module = slice_immutable_exe.root_module,
+    });
+    const run_slice_immutable_tests = b.addRunArtifact(slice_immutable_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -187,6 +229,8 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
     test_step.dependOn(&run_pointer_mutability_tests.step);
+    test_step.dependOn(&run_pointer_immutable_tests.step);
+    test_step.dependOn(&run_slice_immutable_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
