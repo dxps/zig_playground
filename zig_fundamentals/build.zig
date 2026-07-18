@@ -116,6 +116,7 @@ pub fn build(b: *std.Build) void {
     // Each language example is its own executable and gets a matching named
     // run step. Add further examples by repeating this small block with a new
     // source file and step name.
+
     const pointer_mutability_exe = b.addExecutable(.{
         .name = "pointer_mutability",
         .root_module = b.createModule(.{
@@ -134,6 +135,25 @@ pub fn build(b: *std.Build) void {
     run_pointer_mutability_step.dependOn(&run_pointer_mutability_cmd.step);
     run_pointer_mutability_cmd.step.dependOn(b.getInstallStep());
     run_pointer_mutability_cmd.addPassthruArgs();
+
+    const pointer_readonly_exe = b.addExecutable(.{
+        .name = "pointer_mutability",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/pointer_readonly.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(pointer_readonly_exe);
+
+    const pointer_readonly_step = b.step(
+        "run-pointer-readonly",
+        "Run the pointer readonly example",
+    );
+    const run_pointer_readonly_cmd = b.addRunArtifact(pointer_readonly_exe);
+    pointer_readonly_step.dependOn(&run_pointer_readonly_cmd.step);
+    run_pointer_readonly_cmd.step.dependOn(b.getInstallStep());
+    run_pointer_readonly_cmd.addPassthruArgs();
 
     // Creates an executable that will run `test` blocks from the provided module.
     // Here `mod` needs to define a target, which is why earlier we made sure to
