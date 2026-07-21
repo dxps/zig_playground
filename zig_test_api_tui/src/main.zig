@@ -1,8 +1,10 @@
 const std = @import("std");
-const app = @import("zig_test_api_tui");
+
+const app = @import("api_test_tui");
 
 const Result = struct {
     sequence: u64,
+    start_time: [23]u8,
     operation: []const u8,
     method: []const u8,
     url: []const u8,
@@ -17,6 +19,8 @@ const Result = struct {
         try json.beginObject();
         try json.objectField("sequence");
         try json.write(result.sequence);
+        try json.objectField("start_time");
+        try json.write(result.start_time[0..]);
         try json.objectField("operation");
         try json.write(result.operation);
         try json.objectField("method");
@@ -142,8 +146,16 @@ const OperationEvent = union(enum) {
     timeout: void,
 };
 
+const RequestStart = struct {
+    formatted_utc: [23]u8,
+    monotonic: std.Io.Clock.Timestamp,
+};
+
 fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, sequence: usize, max_wait_ms: u64) Result {
-    const started = std.Io.Clock.Timestamp.now(io, .awake);
+    const started: RequestStart = .{
+        .formatted_utc = formatStartTime(std.Io.Timestamp.now(io, .real)),
+        .monotonic = std.Io.Clock.Timestamp.now(io, .awake),
+    };
     var headers: [64]std.http.Header = undefined;
     if (operation.headers.len > headers.len) return makeResult(operation, sequence, started, io, null, "TooManyHeaders", null);
     for (operation.headers, 0..) |header, i| headers[i] = .{ .name = header.name, .value = header.value };
@@ -210,10 +222,11 @@ fn waitForTimeout(io: std.Io, max_wait_ms: u64) void {
     io.sleep(.fromMilliseconds(@intCast(max_wait_ms)), .awake) catch {};
 }
 
-fn makeResult(operation: app.Operation, sequence: usize, started: std.Io.Clock.Timestamp, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
-    const elapsed_ms = started.untilNow(io).raw.toMilliseconds();
+fn makeResult(operation: app.Operation, sequence: usize, started: RequestStart, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
+    const elapsed_ms = started.monotonic.untilNow(io).raw.toMilliseconds();
     return .{
         .sequence = sequence,
+        .start_time = started.formatted_utc,
         .operation = operation.name,
         .method = operation.method,
         .url = operation.url,
@@ -224,6 +237,30 @@ fn makeResult(operation: app.Operation, sequence: usize, started: std.Io.Clock.T
         .error_name = error_name,
         .response_body = response_body,
     };
+}
+
+fn formatStartTime(timestamp: std.Io.Timestamp) [23]u8 {
+    const total_ms = @divFloor(timestamp.toNanoseconds(), std.time.ns_per_ms);
+    const epoch_seconds: std.time.epoch.EpochSeconds = .{
+        .secs = @intCast(@divFloor(total_ms, std.time.ms_per_s)),
+    };
+    const year_day = epoch_seconds.getEpochDay().calculateYearDay();
+    const month_day = year_day.calculateMonthDay();
+    const day_seconds = epoch_seconds.getDaySeconds();
+    const milliseconds: u10 = @intCast(@mod(total_ms, std.time.ms_per_s));
+
+    var buffer: [23]u8 = undefined;
+    const formatted = std.fmt.bufPrint(&buffer, "{d:0>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}:{d:0>2}.{d:0>3}", .{
+        year_day.year,
+        month_day.month.numeric(),
+        month_day.day_index + 1,
+        day_seconds.getHoursIntoDay(),
+        day_seconds.getMinutesIntoHour(),
+        day_seconds.getSecondsIntoMinute(),
+        milliseconds,
+    }) catch unreachable;
+    std.debug.assert(formatted.len == buffer.len);
+    return buffer;
 }
 
 fn renderHeader(writer: *std.Io.Writer, config: app.Config, passed: u64, failed: u64) !void {
@@ -263,6 +300,7 @@ fn exitWithConfigValidationError(io: std.Io, path: []const u8, err: anyerror) no
 test "successful result omits empty error fields" {
     const result: Result = .{
         .sequence = 1,
+        .start_time = "2026-07-21 14:13:12.000".*,
         .operation = "health",
         .method = "GET",
         .url = "https://example.com/health",
@@ -278,4 +316,9 @@ test "successful result omits empty error fields" {
 
     try std.testing.expect(std.mem.indexOf(u8, encoded, "error_name") == null);
     try std.testing.expect(std.mem.indexOf(u8, encoded, "response_body") == null);
+}
+
+test "start time uses UTC millisecond format" {
+    const timestamp = std.Io.Timestamp.fromNanoseconds(1_784_643_192 * std.time.ns_per_s);
+    try std.testing.expectEqualStrings("2026-07-21 14:13:12.000", &formatStartTime(timestamp));
 }
