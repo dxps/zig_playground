@@ -198,6 +198,7 @@ fn fetchOperation(client: *std.http.Client, operation: app.Operation, headers: [
         .method = method,
         .payload = payload,
         .extra_headers = headers,
+        .keep_alive = false,
         .response_writer = &response_body.writer,
     }) catch |err| return .{ .status = null, .error_name = @errorName(err), .response_body = null };
     const owned_body = response_body.toOwnedSlice() catch
