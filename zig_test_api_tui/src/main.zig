@@ -11,6 +11,36 @@ const Result = struct {
     duration_ms: u64,
     passed: bool,
     error_name: ?[]const u8,
+    response_body: ?[]u8,
+
+    pub fn jsonStringify(result: @This(), json: anytype) !void {
+        try json.beginObject();
+        try json.objectField("sequence");
+        try json.write(result.sequence);
+        try json.objectField("operation");
+        try json.write(result.operation);
+        try json.objectField("method");
+        try json.write(result.method);
+        try json.objectField("url");
+        try json.write(result.url);
+        try json.objectField("expected_status");
+        try json.write(result.expected_status);
+        try json.objectField("actual_status");
+        try json.write(result.actual_status);
+        try json.objectField("duration_ms");
+        try json.write(result.duration_ms);
+        try json.objectField("passed");
+        try json.write(result.passed);
+        if (result.error_name) |error_name| {
+            try json.objectField("error_name");
+            try json.write(error_name);
+        }
+        if (result.response_body) |response_body| {
+            try json.objectField("response_body");
+            try json.write(response_body);
+        }
+        try json.endObject();
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -25,11 +55,17 @@ pub fn main(init: std.process.Init) !void {
     }
 
     const config_bytes = try std.Io.Dir.cwd().readFileAlloc(io, args[1], allocator, .limited(1024 * 1024));
-    const parsed = try std.json.parseFromSlice(app.Config, allocator, config_bytes, .{
+    var scanner = std.json.Scanner.initCompleteInput(allocator, config_bytes);
+    defer scanner.deinit();
+    var diagnostics: std.json.Diagnostics = .{};
+    scanner.enableDiagnostics(&diagnostics);
+    const parsed = std.json.parseFromTokenSource(app.Config, allocator, &scanner, .{
         .ignore_unknown_fields = false,
-    });
+    }) catch |err| exitWithConfigParseError(io, args[1], err, &diagnostics);
     defer parsed.deinit();
-    try app.validate(parsed.value);
+    app.validate(parsed.value) catch |err| {
+        exitWithConfigValidationError(io, args[1], err);
+    };
     const config = parsed.value;
 
     const output_file = try std.Io.Dir.cwd().createFile(io, config.output_file, .{ .truncate = true });
@@ -54,6 +90,8 @@ pub fn main(init: std.process.Init) !void {
     try renderHeader(&stdout.interface, config, passed, failed);
     try stdout.interface.flush();
 
+    try output.interface.writeAll("[\n");
+
     for (0..config.run_count) |index| {
         const wait_ms = app.intervalMs(random, config.min_interval_ms, config.max_interval_ms);
         if (wait_ms > 0) try io.sleep(.fromMilliseconds(@intCast(wait_ms)), .awake);
@@ -61,11 +99,12 @@ pub fn main(init: std.process.Init) !void {
         // Fair coverage: every operation runs once per cycle, while the delay
         // before each operation remains independently random.
         const operation = config.operations[index % config.operations.len];
-        const result = runOperation(&client, io, operation, index + 1);
+        const result = runOperation(&client, io, operation, index + 1, config.max_wait_ms);
+        defer if (result.response_body) |body| std.heap.smp_allocator.free(body);
         if (result.passed) passed += 1 else failed += 1;
 
+        if (index > 0) try output.interface.writeAll(",\n");
         try std.json.Stringify.value(result, .{}, &output.interface);
-        try output.interface.writeByte('\n');
         try output.interface.flush();
 
         try stdout.interface.writeAll("\x1b[H");
@@ -85,27 +124,92 @@ pub fn main(init: std.process.Init) !void {
         try stdout.interface.flush();
     }
 
+    try output.interface.writeAll("\n]\n");
+    try output.interface.flush();
+
     try stdout.interface.print("\n\nCompleted {d} calls: {d} passed, {d} failed.\n", .{ config.run_count, passed, failed });
     try stdout.interface.flush();
 }
 
-fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, sequence: usize) Result {
+const FetchOutcome = struct {
+    status: ?u16,
+    error_name: ?[]const u8,
+    response_body: ?[]u8,
+};
+
+const OperationEvent = union(enum) {
+    response: FetchOutcome,
+    timeout: void,
+};
+
+fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, sequence: usize, max_wait_ms: u64) Result {
     const started = std.Io.Clock.Timestamp.now(io, .awake);
     var headers: [64]std.http.Header = undefined;
-    if (operation.headers.len > headers.len) return makeResult(operation, sequence, started, io, null, "TooManyHeaders");
+    if (operation.headers.len > headers.len) return makeResult(operation, sequence, started, io, null, "TooManyHeaders", null);
     for (operation.headers, 0..) |header, i| headers[i] = .{ .name = header.name, .value = header.value };
 
+    var event_buffer: [2]OperationEvent = undefined;
+    var select: std.Io.Select(OperationEvent) = .init(io, &event_buffer);
+    select.async(.response, fetchOperation, .{ client, operation, headers[0..operation.headers.len] });
+    select.async(.timeout, waitForTimeout, .{ io, max_wait_ms });
+
+    const event = select.await() catch {
+        cancelOperationSelect(&select);
+        return makeResult(operation, sequence, started, io, null, "Canceled", null);
+    };
+    cancelOperationSelect(&select);
+
+    return switch (event) {
+        .response => |outcome| response: {
+            if (outcome.status != null and outcome.status.? == operation.expected_status) {
+                if (outcome.response_body) |body| std.heap.smp_allocator.free(body);
+                break :response makeResult(operation, sequence, started, io, outcome.status, outcome.error_name, null);
+            }
+            break :response makeResult(operation, sequence, started, io, outcome.status, outcome.error_name, outcome.response_body);
+        },
+        .timeout => makeResult(operation, sequence, started, io, null, "Timeout", null),
+    };
+}
+
+fn cancelOperationSelect(select: *std.Io.Select(OperationEvent)) void {
+    while (select.cancel()) |event| switch (event) {
+        .response => |outcome| if (outcome.response_body) |body| std.heap.smp_allocator.free(body),
+        .timeout => {},
+    };
+}
+
+fn fetchOperation(client: *std.http.Client, operation: app.Operation, headers: []const std.http.Header) FetchOutcome {
+    var allocated_body: ?[]u8 = null;
+    defer if (allocated_body) |body| client.allocator.free(body);
+    const payload: ?[]const u8 = if (operation.body) |body| switch (body) {
+        .string => |string| string,
+        else => blk: {
+            allocated_body = std.json.Stringify.valueAlloc(client.allocator, body, .{}) catch
+                return .{ .status = null, .error_name = "OutOfMemory", .response_body = null };
+            break :blk allocated_body.?;
+        },
+    } else null;
+
     const method = std.meta.stringToEnum(std.http.Method, operation.method).?;
+    var response_body: std.Io.Writer.Allocating = .init(std.heap.smp_allocator);
+    defer response_body.deinit();
     const response = client.fetch(.{
         .location = .{ .url = operation.url },
         .method = method,
-        .payload = operation.body,
-        .extra_headers = headers[0..operation.headers.len],
-    }) catch |err| return makeResult(operation, sequence, started, io, null, @errorName(err));
-    return makeResult(operation, sequence, started, io, @intFromEnum(response.status), null);
+        .payload = payload,
+        .extra_headers = headers,
+        .response_writer = &response_body.writer,
+    }) catch |err| return .{ .status = null, .error_name = @errorName(err), .response_body = null };
+    const owned_body = response_body.toOwnedSlice() catch
+        return .{ .status = null, .error_name = "OutOfMemory", .response_body = null };
+    return .{ .status = @intFromEnum(response.status), .error_name = null, .response_body = owned_body };
 }
 
-fn makeResult(operation: app.Operation, sequence: usize, started: std.Io.Clock.Timestamp, io: std.Io, status: ?u16, error_name: ?[]const u8) Result {
+fn waitForTimeout(io: std.Io, max_wait_ms: u64) void {
+    io.sleep(.fromMilliseconds(@intCast(max_wait_ms)), .awake) catch {};
+}
+
+fn makeResult(operation: app.Operation, sequence: usize, started: std.Io.Clock.Timestamp, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
     const elapsed_ms = started.untilNow(io).raw.toMilliseconds();
     return .{
         .sequence = sequence,
@@ -117,6 +221,7 @@ fn makeResult(operation: app.Operation, sequence: usize, started: std.Io.Clock.T
         .duration_ms = @intCast(elapsed_ms),
         .passed = status != null and status.? == operation.expected_status,
         .error_name = error_name,
+        .response_body = response_body,
     };
 }
 
@@ -131,4 +236,45 @@ fn printUsage(io: std.Io, executable: []const u8) !void {
     var stdout = std.Io.File.stdout().writer(io, &buffer);
     try stdout.interface.print("Usage: {s} <config.json>\n", .{executable});
     try stdout.interface.flush();
+}
+
+fn exitWithConfigParseError(io: std.Io, path: []const u8, err: anyerror, diagnostics: *const std.json.Diagnostics) noreturn {
+    var buffer: [1024]u8 = undefined;
+    var stderr = std.Io.File.stderr().writer(io, &buffer);
+    stderr.interface.print("Invalid configuration in {s} at line {d}, column {d}: {s}\n", .{
+        path,
+        diagnostics.getLine(),
+        diagnostics.getColumn(),
+        @errorName(err),
+    }) catch {};
+    stderr.interface.flush() catch {};
+    std.process.exit(1);
+}
+
+fn exitWithConfigValidationError(io: std.Io, path: []const u8, err: anyerror) noreturn {
+    var buffer: [1024]u8 = undefined;
+    var stderr = std.Io.File.stderr().writer(io, &buffer);
+    stderr.interface.print("Invalid configuration in {s}: {s}\n", .{ path, @errorName(err) }) catch {};
+    stderr.interface.flush() catch {};
+    std.process.exit(1);
+}
+
+test "successful result omits empty error fields" {
+    const result: Result = .{
+        .sequence = 1,
+        .operation = "health",
+        .method = "GET",
+        .url = "https://example.com/health",
+        .expected_status = 200,
+        .actual_status = 200,
+        .duration_ms = 10,
+        .passed = true,
+        .error_name = null,
+        .response_body = null,
+    };
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
+    defer std.testing.allocator.free(encoded);
+
+    try std.testing.expect(std.mem.indexOf(u8, encoded, "error_name") == null);
+    try std.testing.expect(std.mem.indexOf(u8, encoded, "response_body") == null);
 }

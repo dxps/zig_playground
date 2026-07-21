@@ -1,6 +1,7 @@
 {
 	"min_interval_ms": 500,
 	"max_interval_ms": 2000,
+	"max_wait_ms": 5000,
 	"run_count": 10,
 	"output_file": "test_result.json",
 	"operations": [

@@ -10,21 +10,23 @@ pub const Operation = struct {
     url: []const u8,
     method: []const u8,
     headers: []const Header = &.{},
-    body: ?[]const u8 = null,
+    body: ?std.json.Value = null,
     expected_status: u16,
 };
 
 pub const Config = struct {
     min_interval_ms: u64 = 500,
     max_interval_ms: u64 = 2_000,
+    max_wait_ms: u64 = 5_000,
     run_count: u64 = 20,
-    output_file: []const u8 = "api-test-results.jsonl",
+    output_file: []const u8 = "test_result.json",
     operations: []const Operation,
 };
 
 pub fn validate(config: Config) !void {
     if (config.operations.len == 0) return error.NoOperations;
     if (config.min_interval_ms > config.max_interval_ms) return error.InvalidInterval;
+    if (config.max_wait_ms == 0) return error.InvalidMaxWait;
     if (config.run_count == 0) return error.InvalidRunCount;
     for (config.operations) |operation| {
         if (operation.name.len == 0) return error.EmptyOperationName;
@@ -54,9 +56,25 @@ test "configuration validation" {
     invalid.min_interval_ms = 10;
     invalid.max_interval_ms = 5;
     try std.testing.expectError(error.InvalidInterval, validate(invalid));
+
+    invalid = valid;
+    invalid.max_wait_ms = 0;
+    try std.testing.expectError(error.InvalidMaxWait, validate(invalid));
 }
 
 test "fixed interval" {
     var prng = std.Random.DefaultPrng.init(123);
     try std.testing.expectEqual(@as(u64, 42), intervalMs(prng.random(), 42, 42));
+}
+
+test "structured JSON request body" {
+    const source =
+        \\{"operations":[{"name":"login","url":"https://example.com/login","method":"POST","body":[{"username":"user"}],"expected_status":200}]}
+    ;
+    const parsed = try std.json.parseFromSlice(Config, std.testing.allocator, source, .{});
+    defer parsed.deinit();
+
+    const body = parsed.value.operations[0].body.?;
+    try std.testing.expectEqual(@as(usize, 1), body.array.items.len);
+    try std.testing.expectEqualStrings("user", body.array.items[0].object.get("username").?.string);
 }
