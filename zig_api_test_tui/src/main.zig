@@ -50,12 +50,15 @@ const Result = struct {
 pub fn main(init: std.process.Init) !void {
     const allocator = init.arena.allocator();
     const io = init.io;
+    const execution_start_epoch_seconds = std.Io.Timestamp.now(io, .real).toSeconds();
     const args = try init.minimal.args.toSlice(allocator);
 
     if (args.len != 2 or std.mem.eql(u8, args[1], "--help") or std.mem.eql(u8, args[1], "-h")) {
         try printUsage(io, args[0]);
         return;
     }
+
+    const test_run_id = try std.fmt.allocPrint(allocator, "{d}", .{execution_start_epoch_seconds});
 
     const config_bytes = try std.Io.Dir.cwd().readFileAlloc(io, args[1], allocator, .limited(1024 * 1024));
     var scanner = std.json.Scanner.initCompleteInput(allocator, config_bytes);
@@ -102,7 +105,7 @@ pub fn main(init: std.process.Init) !void {
         // Fair coverage: every operation runs once per cycle, while the delay
         // before each operation remains independently random.
         const operation = config.operations[index % config.operations.len];
-        const result = runOperation(&client, io, operation, index + 1, config.max_wait_ms);
+        const result = runOperation(&client, io, operation, index + 1, config.max_wait_ms, test_run_id);
         defer if (result.response_body) |body| std.heap.smp_allocator.free(body);
         if (result.passed) passed += 1 else failed += 1;
 
@@ -150,18 +153,20 @@ const RequestStart = struct {
     monotonic: std.Io.Clock.Timestamp,
 };
 
-fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, sequence: usize, max_wait_ms: u64) Result {
+fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, sequence: usize, max_wait_ms: u64, test_run_id: []const u8) Result {
     const started: RequestStart = .{
         .formatted_utc = formatStartTime(std.Io.Timestamp.now(io, .real)),
         .monotonic = std.Io.Clock.Timestamp.now(io, .awake),
     };
-    var headers: [64]std.http.Header = undefined;
-    if (operation.headers.len > headers.len) return makeResult(operation, sequence, started, io, null, "TooManyHeaders", null);
-    for (operation.headers, 0..) |header, i| headers[i] = .{ .name = header.name, .value = header.value };
+    var request_id_buffer: [20]u8 = undefined;
+    const request_id = std.fmt.bufPrint(&request_id_buffer, "{d}", .{sequence}) catch unreachable;
+    var header_storage: [66]std.http.Header = undefined;
+    const headers = prepareHeaders(operation, test_run_id, request_id, &header_storage) orelse
+        return makeResult(operation, sequence, started, io, null, "TooManyHeaders", null);
 
     var event_buffer: [2]OperationEvent = undefined;
     var select: std.Io.Select(OperationEvent) = .init(io, &event_buffer);
-    select.async(.response, fetchOperation, .{ client, operation, headers[0..operation.headers.len] });
+    select.async(.response, fetchOperation, .{ client, operation, headers });
     select.async(.timeout, waitForTimeout, .{ io, max_wait_ms });
 
     const event = select.await() catch {
@@ -180,6 +185,18 @@ fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, 
         },
         .timeout => makeResult(operation, sequence, started, io, null, "Timeout", null),
     };
+}
+
+fn prepareHeaders(operation: app.Operation, test_run_id: []const u8, request_id: []const u8, storage: *[66]std.http.Header) ?[]const std.http.Header {
+    const implicit_header_count = 2;
+    if (operation.headers.len > storage.len - implicit_header_count) return null;
+
+    storage[0] = .{ .name = "X-Test-Run-ID", .value = test_run_id };
+    storage[1] = .{ .name = "X-Request-ID", .value = request_id };
+    for (operation.headers, 0..) |header, i| {
+        storage[i + implicit_header_count] = .{ .name = header.name, .value = header.value };
+    }
+    return storage[0 .. operation.headers.len + implicit_header_count];
 }
 
 fn cancelOperationSelect(select: *std.Io.Select(OperationEvent)) void {
@@ -320,4 +337,23 @@ test "successful result omits empty error fields" {
 test "start time uses UTC millisecond format" {
     const timestamp = std.Io.Timestamp.fromNanoseconds(1_784_643_192 * std.time.ns_per_s);
     try std.testing.expectEqualStrings("2026-07-21 14:13:12.000", &formatStartTime(timestamp));
+}
+
+test "implicit request headers precede configured headers" {
+    const operation: app.Operation = .{
+        .name = "health",
+        .url = "https://example.com/health",
+        .method = "GET",
+        .headers = &.{.{ .name = "Accept", .value = "application/json" }},
+        .expected_status = 200,
+    };
+    var storage: [66]std.http.Header = undefined;
+    const headers = prepareHeaders(operation, "1784643192", "7", &storage).?;
+
+    try std.testing.expectEqual(@as(usize, 3), headers.len);
+    try std.testing.expectEqualStrings("X-Test-Run-ID", headers[0].name);
+    try std.testing.expectEqualStrings("1784643192", headers[0].value);
+    try std.testing.expectEqualStrings("X-Request-ID", headers[1].name);
+    try std.testing.expectEqualStrings("7", headers[1].value);
+    try std.testing.expectEqualStrings("Accept", headers[2].name);
 }

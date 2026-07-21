@@ -19,6 +19,12 @@ The configuration fields are:
   `headers`, optional JSON `body`, and `expected_status`. Object and array bodies
   are JSON-encoded; string bodies are sent as raw text.
 
+Every request also includes two implicit headers:
+
+- `X-Test-Run-ID`: the execution startup time as Unix epoch seconds; identical
+  for every request in one run.
+- `X-Request-ID`: a monotonically increasing request number starting at `1`.
+
 Each object in the JSON array includes the operation, its UTC `start_time` in
 `YYYY-MM-DD HH:mm:ss.SSS` format, expected and actual status, elapsed
 milliseconds, pass/fail state, and a Zig error name when transport failed. When
