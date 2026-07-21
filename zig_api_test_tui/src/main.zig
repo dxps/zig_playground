@@ -54,8 +54,7 @@ pub fn main(init: std.process.Init) !void {
 
     if (args.len != 2 or std.mem.eql(u8, args[1], "--help") or std.mem.eql(u8, args[1], "-h")) {
         try printUsage(io, args[0]);
-        if (args.len == 2) return;
-        return error.InvalidArguments;
+        return;
     }
 
     const config_bytes = try std.Io.Dir.cwd().readFileAlloc(io, args[1], allocator, .limited(1024 * 1024));
@@ -215,7 +214,7 @@ fn fetchOperation(client: *std.http.Client, operation: app.Operation, headers: [
     }) catch |err| return .{ .status = null, .error_name = @errorName(err), .response_body = null };
     const owned_body = response_body.toOwnedSlice() catch
         return .{ .status = null, .error_name = "OutOfMemory", .response_body = null };
-    return .{ .status = @intFromEnum(response.status), .error_name = null, .response_body = owned_body };
+    return .{ .status = @backingInt(response.status), .error_name = null, .response_body = owned_body };
 }
 
 fn waitForTimeout(io: std.Io, max_wait_ms: u64) void {
