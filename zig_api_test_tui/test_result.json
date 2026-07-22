@@ -1,12 +1,12 @@
 [
-{"run_id":"1784710608","req_id":1,"start_time":"2026-07-22 08:56:49.813","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":2717,"passed":true},
-{"run_id":"1784710608","req_id":2,"start_time":"2026-07-22 08:56:53.730","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":120,"passed":true},
-{"run_id":"1784710608","req_id":3,"start_time":"2026-07-22 08:56:54.600","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":127,"passed":true},
-{"run_id":"1784710608","req_id":4,"start_time":"2026-07-22 08:56:56.068","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":129,"passed":true},
-{"run_id":"1784710608","req_id":5,"start_time":"2026-07-22 08:56:56.938","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":137,"passed":true},
-{"run_id":"1784710608","req_id":6,"start_time":"2026-07-22 08:56:57.611","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":130,"passed":true},
-{"run_id":"1784710608","req_id":7,"start_time":"2026-07-22 08:56:58.813","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":212,"passed":true},
-{"run_id":"1784710608","req_id":8,"start_time":"2026-07-22 08:57:00.771","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":118,"passed":true},
-{"run_id":"1784710608","req_id":9,"start_time":"2026-07-22 08:57:02.354","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":131,"passed":true},
-{"run_id":"1784710608","req_id":10,"start_time":"2026-07-22 08:57:03.900","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":134,"passed":true}
+{"uid":"1784712075-1","start_time":"2026-07-22 09:21:17.177","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":2011,"passed":true},
+{"uid":"1784712075-2","start_time":"2026-07-22 09:21:20.246","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":123,"passed":true},
+{"uid":"1784712075-3","start_time":"2026-07-22 09:21:22.125","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":130,"passed":true},
+{"uid":"1784712075-4","start_time":"2026-07-22 09:21:24.165","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":136,"passed":true},
+{"uid":"1784712075-5","start_time":"2026-07-22 09:21:25.486","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":136,"passed":true},
+{"uid":"1784712075-6","start_time":"2026-07-22 09:21:27.420","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":139,"passed":true},
+{"uid":"1784712075-7","start_time":"2026-07-22 09:21:29.133","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":131,"passed":true},
+{"uid":"1784712075-8","start_time":"2026-07-22 09:21:30.333","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":137,"passed":true},
+{"uid":"1784712075-9","start_time":"2026-07-22 09:21:31.075","operation":"get example","method":"GET","url":"https://example.com/","expected_status":200,"actual_status":200,"duration_ms":139,"passed":true},
+{"uid":"1784712075-10","start_time":"2026-07-22 09:21:32.218","operation":"missing page","method":"GET","url":"https://example.com/not-found","expected_status":404,"actual_status":404,"duration_ms":142,"passed":true}
 ]

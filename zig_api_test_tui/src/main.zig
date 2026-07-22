@@ -3,8 +3,7 @@ const std = @import("std");
 const app = @import("api_test_tui");
 
 const Result = struct {
-    run_id: []const u8,
-    req_id: u64,
+    uid: []const u8,
     start_time: [23]u8,
     operation: []const u8,
     method: []const u8,
@@ -18,10 +17,8 @@ const Result = struct {
 
     pub fn jsonStringify(result: @This(), json: anytype) !void {
         try json.beginObject();
-        try json.objectField("run_id");
-        try json.write(result.run_id);
-        try json.objectField("req_id");
-        try json.write(result.req_id);
+        try json.objectField("uid");
+        try json.write(result.uid);
         try json.objectField("start_time");
         try json.write(result.start_time[0..]);
         try json.objectField("operation");
@@ -61,7 +58,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
 
-    const test_run_id = try std.fmt.allocPrint(allocator, "{d}", .{execution_start_epoch_seconds});
+    const uid_prefix = try std.fmt.allocPrint(allocator, "{d}", .{execution_start_epoch_seconds});
 
     const config_bytes = try std.Io.Dir.cwd().readFileAlloc(io, args[1], allocator, .limited(1024 * 1024));
     var scanner = std.json.Scanner.initCompleteInput(allocator, config_bytes);
@@ -108,7 +105,8 @@ pub fn main(init: std.process.Init) !void {
         // Fair coverage: every operation runs once per cycle, while the delay
         // before each operation remains independently random.
         const operation = config.operations[index % config.operations.len];
-        const result = runOperation(&client, io, operation, index + 1, config.max_wait_ms, test_run_id);
+        const uid = try std.fmt.allocPrint(allocator, "{s}-{d}", .{ uid_prefix, index + 1 });
+        const result = runOperation(&client, io, operation, uid, config.max_wait_ms);
         defer if (result.response_body) |body| std.heap.smp_allocator.free(body);
         if (result.passed) passed += 1 else failed += 1;
 
@@ -156,16 +154,14 @@ const RequestStart = struct {
     monotonic: std.Io.Clock.Timestamp,
 };
 
-fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, sequence: usize, max_wait_ms: u64, test_run_id: []const u8) Result {
+fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, uid: []const u8, max_wait_ms: u64) Result {
     const started: RequestStart = .{
         .formatted_utc = formatStartTime(std.Io.Timestamp.now(io, .real)),
         .monotonic = std.Io.Clock.Timestamp.now(io, .awake),
     };
-    var request_id_buffer: [20]u8 = undefined;
-    const request_id = std.fmt.bufPrint(&request_id_buffer, "{d}", .{sequence}) catch unreachable;
-    var header_storage: [66]std.http.Header = undefined;
-    const headers = prepareHeaders(operation, test_run_id, request_id, &header_storage) orelse
-        return makeResult(operation, test_run_id, sequence, started, io, null, "TooManyHeaders", null);
+    var header_storage: [65]std.http.Header = undefined;
+    const headers = prepareHeaders(operation, uid, &header_storage) orelse
+        return makeResult(operation, uid, started, io, null, "TooManyHeaders", null);
 
     var event_buffer: [2]OperationEvent = undefined;
     var select: std.Io.Select(OperationEvent) = .init(io, &event_buffer);
@@ -174,7 +170,7 @@ fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, 
 
     const event = select.await() catch {
         cancelOperationSelect(&select);
-        return makeResult(operation, test_run_id, sequence, started, io, null, "Canceled", null);
+        return makeResult(operation, uid, started, io, null, "Canceled", null);
     };
     cancelOperationSelect(&select);
 
@@ -182,20 +178,19 @@ fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, 
         .response => |outcome| response: {
             if (outcome.status != null and outcome.status.? == operation.expected_status) {
                 if (outcome.response_body) |body| std.heap.smp_allocator.free(body);
-                break :response makeResult(operation, test_run_id, sequence, started, io, outcome.status, outcome.error_name, null);
+                break :response makeResult(operation, uid, started, io, outcome.status, outcome.error_name, null);
             }
-            break :response makeResult(operation, test_run_id, sequence, started, io, outcome.status, outcome.error_name, outcome.response_body);
+            break :response makeResult(operation, uid, started, io, outcome.status, outcome.error_name, outcome.response_body);
         },
-        .timeout => makeResult(operation, test_run_id, sequence, started, io, null, "Timeout", null),
+        .timeout => makeResult(operation, uid, started, io, null, "Timeout", null),
     };
 }
 
-fn prepareHeaders(operation: app.Operation, test_run_id: []const u8, request_id: []const u8, storage: *[66]std.http.Header) ?[]const std.http.Header {
-    const implicit_header_count = 2;
+fn prepareHeaders(operation: app.Operation, uid: []const u8, storage: *[65]std.http.Header) ?[]const std.http.Header {
+    const implicit_header_count = 1;
     if (operation.headers.len > storage.len - implicit_header_count) return null;
 
-    storage[0] = .{ .name = "X-Test-Run-ID", .value = test_run_id };
-    storage[1] = .{ .name = "X-Request-ID", .value = request_id };
+    storage[0] = .{ .name = "X-Unique-ID", .value = uid };
     for (operation.headers, 0..) |header, i| {
         storage[i + implicit_header_count] = .{ .name = header.name, .value = header.value };
     }
@@ -241,11 +236,10 @@ fn waitForTimeout(io: std.Io, max_wait_ms: u64) void {
     io.sleep(.fromMilliseconds(@intCast(max_wait_ms)), .awake) catch {};
 }
 
-fn makeResult(operation: app.Operation, run_id: []const u8, req_id: usize, started: RequestStart, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
+fn makeResult(operation: app.Operation, uid: []const u8, started: RequestStart, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
     const elapsed_ms = started.monotonic.untilNow(io).raw.toMilliseconds();
     return .{
-        .run_id = run_id,
-        .req_id = req_id,
+        .uid = uid,
         .start_time = started.formatted_utc,
         .operation = operation.name,
         .method = operation.method,
@@ -319,8 +313,7 @@ fn exitWithConfigValidationError(io: std.Io, path: []const u8, err: anyerror) no
 
 test "successful result omits empty error fields" {
     const result: Result = .{
-        .run_id = "1784643192",
-        .req_id = 1,
+        .uid = "1784643192-1",
         .start_time = "2026-07-21 14:13:12.000".*,
         .operation = "health",
         .method = "GET",
@@ -335,7 +328,7 @@ test "successful result omits empty error fields" {
     const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
     defer std.testing.allocator.free(encoded);
 
-    try std.testing.expect(std.mem.startsWith(u8, encoded, "{\"run_id\":\"1784643192\",\"req_id\":1,"));
+    try std.testing.expect(std.mem.startsWith(u8, encoded, "{\"uid\":\"1784643192-1\","));
     try std.testing.expect(std.mem.indexOf(u8, encoded, "error_name") == null);
     try std.testing.expect(std.mem.indexOf(u8, encoded, "response_body") == null);
 }
@@ -353,13 +346,11 @@ test "implicit request headers precede configured headers" {
         .headers = &.{.{ .name = "Accept", .value = "application/json" }},
         .expected_status = 200,
     };
-    var storage: [66]std.http.Header = undefined;
-    const headers = prepareHeaders(operation, "1784643192", "7", &storage).?;
+    var storage: [65]std.http.Header = undefined;
+    const headers = prepareHeaders(operation, "1784643192-7", &storage).?;
 
-    try std.testing.expectEqual(@as(usize, 3), headers.len);
-    try std.testing.expectEqualStrings("X-Test-Run-ID", headers[0].name);
-    try std.testing.expectEqualStrings("1784643192", headers[0].value);
-    try std.testing.expectEqualStrings("X-Request-ID", headers[1].name);
-    try std.testing.expectEqualStrings("7", headers[1].value);
-    try std.testing.expectEqualStrings("Accept", headers[2].name);
+    try std.testing.expectEqual(@as(usize, 2), headers.len);
+    try std.testing.expectEqualStrings("X-Unique-ID", headers[0].name);
+    try std.testing.expectEqualStrings("1784643192-7", headers[0].value);
+    try std.testing.expectEqualStrings("Accept", headers[1].name);
 }
