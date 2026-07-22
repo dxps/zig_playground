@@ -25,8 +25,9 @@ Every request also includes two implicit headers:
   for every request in one run.
 - `X-Request-ID`: a monotonically increasing request number starting at `1`.
 
-Each object in the JSON array includes the operation, its UTC `start_time` in
-`YYYY-MM-DD HH:mm:ss.SSS` format, expected and actual status, elapsed
+Each object in the JSON array starts with `run_id` and `req_id`, matching the
+values sent in `X-Test-Run-ID` and `X-Request-ID`. It also includes the operation,
+its UTC `start_time` in `YYYY-MM-DD HH:mm:ss.SSS` format, expected and actual status, elapsed
 milliseconds, pass/fail state, and a Zig error name when transport failed. When
 the actual HTTP status differs from `expected_status`, it also includes the
 response body in `response_body`.

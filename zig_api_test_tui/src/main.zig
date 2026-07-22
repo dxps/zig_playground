@@ -3,7 +3,8 @@ const std = @import("std");
 const app = @import("api_test_tui");
 
 const Result = struct {
-    sequence: u64,
+    run_id: []const u8,
+    req_id: u64,
     start_time: [23]u8,
     operation: []const u8,
     method: []const u8,
@@ -17,8 +18,10 @@ const Result = struct {
 
     pub fn jsonStringify(result: @This(), json: anytype) !void {
         try json.beginObject();
-        try json.objectField("sequence");
-        try json.write(result.sequence);
+        try json.objectField("run_id");
+        try json.write(result.run_id);
+        try json.objectField("req_id");
+        try json.write(result.req_id);
         try json.objectField("start_time");
         try json.write(result.start_time[0..]);
         try json.objectField("operation");
@@ -162,7 +165,7 @@ fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, 
     const request_id = std.fmt.bufPrint(&request_id_buffer, "{d}", .{sequence}) catch unreachable;
     var header_storage: [66]std.http.Header = undefined;
     const headers = prepareHeaders(operation, test_run_id, request_id, &header_storage) orelse
-        return makeResult(operation, sequence, started, io, null, "TooManyHeaders", null);
+        return makeResult(operation, test_run_id, sequence, started, io, null, "TooManyHeaders", null);
 
     var event_buffer: [2]OperationEvent = undefined;
     var select: std.Io.Select(OperationEvent) = .init(io, &event_buffer);
@@ -171,7 +174,7 @@ fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, 
 
     const event = select.await() catch {
         cancelOperationSelect(&select);
-        return makeResult(operation, sequence, started, io, null, "Canceled", null);
+        return makeResult(operation, test_run_id, sequence, started, io, null, "Canceled", null);
     };
     cancelOperationSelect(&select);
 
@@ -179,11 +182,11 @@ fn runOperation(client: *std.http.Client, io: std.Io, operation: app.Operation, 
         .response => |outcome| response: {
             if (outcome.status != null and outcome.status.? == operation.expected_status) {
                 if (outcome.response_body) |body| std.heap.smp_allocator.free(body);
-                break :response makeResult(operation, sequence, started, io, outcome.status, outcome.error_name, null);
+                break :response makeResult(operation, test_run_id, sequence, started, io, outcome.status, outcome.error_name, null);
             }
-            break :response makeResult(operation, sequence, started, io, outcome.status, outcome.error_name, outcome.response_body);
+            break :response makeResult(operation, test_run_id, sequence, started, io, outcome.status, outcome.error_name, outcome.response_body);
         },
-        .timeout => makeResult(operation, sequence, started, io, null, "Timeout", null),
+        .timeout => makeResult(operation, test_run_id, sequence, started, io, null, "Timeout", null),
     };
 }
 
@@ -238,10 +241,11 @@ fn waitForTimeout(io: std.Io, max_wait_ms: u64) void {
     io.sleep(.fromMilliseconds(@intCast(max_wait_ms)), .awake) catch {};
 }
 
-fn makeResult(operation: app.Operation, sequence: usize, started: RequestStart, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
+fn makeResult(operation: app.Operation, run_id: []const u8, req_id: usize, started: RequestStart, io: std.Io, status: ?u16, error_name: ?[]const u8, response_body: ?[]u8) Result {
     const elapsed_ms = started.monotonic.untilNow(io).raw.toMilliseconds();
     return .{
-        .sequence = sequence,
+        .run_id = run_id,
+        .req_id = req_id,
         .start_time = started.formatted_utc,
         .operation = operation.name,
         .method = operation.method,
@@ -315,7 +319,8 @@ fn exitWithConfigValidationError(io: std.Io, path: []const u8, err: anyerror) no
 
 test "successful result omits empty error fields" {
     const result: Result = .{
-        .sequence = 1,
+        .run_id = "1784643192",
+        .req_id = 1,
         .start_time = "2026-07-21 14:13:12.000".*,
         .operation = "health",
         .method = "GET",
@@ -330,6 +335,7 @@ test "successful result omits empty error fields" {
     const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
     defer std.testing.allocator.free(encoded);
 
+    try std.testing.expect(std.mem.startsWith(u8, encoded, "{\"run_id\":\"1784643192\",\"req_id\":1,"));
     try std.testing.expect(std.mem.indexOf(u8, encoded, "error_name") == null);
     try std.testing.expect(std.mem.indexOf(u8, encoded, "response_body") == null);
 }
