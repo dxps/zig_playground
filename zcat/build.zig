@@ -7,20 +7,23 @@ const std = @import("std");
 // build runner to parallelize the build automatically (and the cache system to
 // know when a step doesn't need to be re-run).
 pub fn build(b: *std.Build) void {
+
     // Standard target options allow the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
+
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
+
     // It's also possible to define more custom flags to toggle optional features
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
-
+    //
     // This creates a module, which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
     // Zig modules are the preferred way of making Zig code available to consumers.
@@ -40,6 +43,15 @@ pub fn build(b: *std.Build) void {
         // which requires us to specify a target.
         .target = target,
     });
+
+    // CLI arguments of the executable.
+    const reader_buffer_size = b.option(usize, "reader-buffer-size", "Reader buffer bytes") orelse 1024;
+    const writer_buffer_size = b.option(usize, "writer-buffer-size", "Writer buffer bytes") orelse 1024;
+    const options = b.addOptions();
+    options.addOption(usize, "reader_buffer_size", reader_buffer_size);
+    options.addOption(usize, "writer_buffer_size", writer_buffer_size);
+
+    const options_mod = options.createModule();
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -79,6 +91,7 @@ pub fn build(b: *std.Build) void {
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
                 .{ .name = "zcat", .module = mod },
+                .{ .name = "options", .module = options_mod },
             },
         }),
     });
