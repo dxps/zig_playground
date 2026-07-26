@@ -14,3 +14,6 @@ Small, independent executables that illustrate different Zig language concepts.
 - List all available build and run steps: `zig build --help`
 - Build every executable without running it: `zig build`
 - Run all tests: `zig build test`
+
+Alternatively, each example can be run using the classic `zig build run src/<example.zig>, <br/>
+such as `zig run src/std_arraylist.zig`.

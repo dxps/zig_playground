@@ -16,7 +16,7 @@ pub fn main() void {
     slice_rw[2] += 1;
 
     std.debug.print("     arr: {any}\n", .{arr});
-    std.debug.print("slice_rw: {any} length={} pointer={x}\n", .{
-        slice_rw, slice_rw.len, @intFromPtr(slice_rw.ptr),
+    std.debug.print("slice_rw: {any} length={} pointer={*}\n", .{
+        slice_rw, slice_rw.len, slice_rw.ptr,
     });
 }
