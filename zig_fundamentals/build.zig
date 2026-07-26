@@ -186,6 +186,31 @@ pub fn build(b: *std.Build) void {
     run_slice_immutable_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
+    // Example: empty_file
+    // ---------------------------------------------------------------------------
+
+    const empty_file_exe = b.addExecutable(.{
+        .name = "empty_file",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/empty_file.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(empty_file_exe);
+
+    const empty_file_step = b.step(
+        "run-empty-file",
+        "Run the 'empty file' example",
+    );
+    const run_empty_file_cmd = b.addRunArtifact(empty_file_exe);
+    empty_file_step.dependOn(&run_empty_file_cmd.step);
+    // This is optional, as it only copies the artifact into `zig-out/bin`,
+    // thus it's not required to run it (using `zig build run-empty-file`).
+    run_empty_file_cmd.step.dependOn(b.getInstallStep());
+    run_empty_file_cmd.addPassthruArgs();
+
+    // ---------------------------------------------------------------------------
 
     // Creates an executable that will run `test` blocks from the provided module.
     // Here `mod` needs to define a target, which is why earlier we made sure to
