@@ -118,7 +118,8 @@ pub fn build(b: *std.Build) void {
     // source file and step name.
 
     // ---------------------------------------------------------------------------
-    // Example: pointer_mutability
+    // pointer_mutability
+    // ---------------------------------------------------------------------------
 
     const pointer_mutability_exe = b.addExecutable(.{
         .name = "pointer_mutability",
@@ -140,7 +141,7 @@ pub fn build(b: *std.Build) void {
     run_pointer_mutability_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
-    // Example: pointer_immutable
+    // pointer_immutable
     // ---------------------------------------------------------------------------
 
     const pointer_immutable_exe = b.addExecutable(.{
@@ -163,7 +164,7 @@ pub fn build(b: *std.Build) void {
     run_pointer_immutable_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
-    // Example: slice_immutable
+    // slice_immutable
     // ---------------------------------------------------------------------------
 
     const slice_immutable_exe = b.addExecutable(.{
@@ -186,7 +187,7 @@ pub fn build(b: *std.Build) void {
     run_slice_immutable_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
-    // Example: empty_file
+    // empty_file
     // ---------------------------------------------------------------------------
 
     const empty_file_exe = b.addExecutable(.{
@@ -209,6 +210,31 @@ pub fn build(b: *std.Build) void {
     // thus it's not required to run it (using `zig build run-empty-file`).
     run_empty_file_cmd.step.dependOn(b.getInstallStep());
     run_empty_file_cmd.addPassthruArgs();
+
+    // ---------------------------------------------------------------------------
+    // slices
+    // ---------------------------------------------------------------------------
+
+    const slices_exe = b.addExecutable(.{
+        .name = "slices",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/slices.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(slices_exe);
+
+    const slices_step = b.step(
+        "run-slices",
+        "Run the 'slices' example",
+    );
+    const run_slices_cmd = b.addRunArtifact(slices_exe);
+    slices_step.dependOn(&run_slices_cmd.step);
+    // This is optional, as it only copies the artifact into `zig-out/bin`,
+    // thus it's not required to run it (using `zig build run-slices`).
+    run_slices_cmd.step.dependOn(b.getInstallStep());
+    run_slices_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
 
