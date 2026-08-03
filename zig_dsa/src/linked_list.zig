@@ -21,6 +21,9 @@
 // For all the functions above, feel free to modify the return types to account for error handling:
 //  e.g. make the return type optional, or an error union
 
+// Note: There is a [SinglyLinkedList](https://codeberg.org/ziglang/zig/src/branch/master/lib/std/SinglyLinkedList.zig)
+//       in the standard library, if you want to check it out.
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const print = std.debug.print;
