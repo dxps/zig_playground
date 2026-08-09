@@ -212,6 +212,31 @@ pub fn build(b: *std.Build) void {
     run_empty_file_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
+    // check_exec_file_c
+    // ---------------------------------------------------------------------------
+
+    const check_exec_file_c = b.addExecutable(.{
+        .name = "check_exec_file_c",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/check_exec_file_c.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(check_exec_file_c);
+
+    const check_exec_file_c_step = b.step(
+        "run-check-exec-file-c",
+        "Run the 'check_exec_file_c' example.",
+    );
+    const run_check_exec_file_c_step_cmd = b.addRunArtifact(check_exec_file_c);
+    check_exec_file_c_step.dependOn(&run_check_exec_file_c_step_cmd.step);
+    // This is optional, as it only copies the artifact into `zig-out/bin`,
+    // thus it's not required to run it (using `zig build run-slices`).
+    run_check_exec_file_c_step_cmd.step.dependOn(b.getInstallStep());
+    run_check_exec_file_c_step_cmd.addPassthruArgs();
+
+    // ---------------------------------------------------------------------------
     // slices
     // ---------------------------------------------------------------------------
 
