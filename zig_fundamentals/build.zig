@@ -12,10 +12,12 @@ pub fn build(b: *std.Build) void {
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
+
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
+
     // It's also possible to define more custom flags to toggle optional features
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
@@ -260,6 +262,29 @@ pub fn build(b: *std.Build) void {
     // thus it's not required to run it (using `zig build run-slices`).
     run_slices_cmd.step.dependOn(b.getInstallStep());
     run_slices_cmd.addPassthruArgs();
+
+    // ---------------------------------------------------------------------------
+    // memory_allocators
+    // ---------------------------------------------------------------------------
+
+    const memory_allocators_exe = b.addExecutable(.{
+        .name = "memory_allocators",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/memory_allocators.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(memory_allocators_exe);
+
+    const run_memory_allocators_step = b.step(
+        "run-memory-allocators",
+        "Run the memory allocators example",
+    );
+    const run_memory_allocators_cmd = b.addRunArtifact(memory_allocators_exe);
+    run_memory_allocators_step.dependOn(&run_memory_allocators_cmd.step);
+    run_memory_allocators_cmd.step.dependOn(b.getInstallStep());
+    run_memory_allocators_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
 
