@@ -49,3 +49,54 @@ pub fn main(init: std.process.Init) !void {
         return error.FileNotFound;
     }
 }
+
+test "filesystem helpers" {
+    const testing = std.testing;
+
+    // Get an `Io` instance for the test.
+    var t: std.Io.Threaded = .init_single_threaded;
+    const io = t.io();
+
+    // Sandbox init.
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    // Create a file (keep it open for `fchmod` later).
+    const filename = "test_bin";
+    const file = try tmp.dir.createFile(io, filename, .{});
+    defer file.close(io);
+
+    // Create a directory.
+    const dirname = "test_subdir";
+    try tmp.dir.createDir(io, dirname, .default_dir);
+
+    // Resolve the full (absolute) paths of the file and directory.
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const abs_file_len = try tmp.dir.realPathFile(io, filename, &path_buf);
+    const abs_file_path = path_buf[0..abs_file_len];
+
+    const subdir = try tmp.dir.openDir(io, dirname, .{});
+    defer subdir.close(io);
+    var dir_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const abs_dir_len = try subdir.realPath(io, &dir_buf);
+    const abs_dir_path = dir_buf[0..abs_dir_len];
+
+    // TEST: canAccess
+    try testing.expect(canAccess(io, abs_file_path));
+    try testing.expect(!canAccess(io, "non_existent_file"));
+
+    // TEST: isFile
+    try testing.expect(isFile(io, abs_file_path));
+    try testing.expect(!isFile(io, abs_dir_path));
+
+    // TEST: isExecutable
+    if (@import("builtin").os.tag != .windows) {
+        // Case A: Make it executable (755)
+        _ = std.c.fchmod(file.handle, 0o755);
+        try testing.expect(isExecutable(io, abs_file_path));
+
+        // Case B: Make it non-executable (644)
+        _ = std.c.fchmod(file.handle, 0o644);
+        try testing.expect(!isExecutable(io, abs_file_path));
+    }
+}
