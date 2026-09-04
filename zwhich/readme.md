@@ -13,3 +13,18 @@ Example:
 /bin/ls
 ❯
 ```
+
+<br/>
+
+### Docs
+
+Run `zig build docs` to generate the documentation.
+
+Then start a local Web server:
+
+```shell
+❯ cd zig-out/docs
+❯ python3 -m http.server 8000
+```
+
+and go to [http://localhost:8000](http://localhost:8000) to view the docs.

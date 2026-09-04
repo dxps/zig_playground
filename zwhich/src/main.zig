@@ -5,6 +5,27 @@ const canAccess = @import("utils.zig").canAccess;
 const isExecutable = @import("utils.zig").isExecutable;
 const isFile = @import("utils.zig").isFile;
 
+/// UNIX `which` command implementation in Zig.\
+/// It finds the first executable instance of a command in `PATH`.
+///
+/// ### Usage
+/// ```sh
+/// $ zig run zwhich.zig -- ls
+/// /usr/bin/ls
+/// ```
+///
+/// ### Behavior
+/// 1. Parses command-line argument.
+/// 2. Splits `PATH` environment variable.
+/// 3. Checks each directory for executable file matching command.
+/// 4. Prints first valid executable path found.
+/// 5. Exits with error if not found.
+///
+/// ### Error handling
+/// - Returns `error.FileNotFound` when command is missing
+/// - Prints usage error for incorrect arguments
+/// - Handles PATH lookup failures
+///
 pub fn main(init: std.process.Init) !void {
     // Parse the command line args.
     const args = try init.minimal.args.toSlice(init.arena.allocator());
