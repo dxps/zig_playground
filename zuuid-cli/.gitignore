@@ -1,0 +1,8 @@
+
+.zig-cache
+zig-out
+zig-pkg
+.idea
+.DS_Store
+
+build-errors.log

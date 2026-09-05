@@ -1,0 +1,18 @@
+.{
+    .name = .zuuid_cli,
+    .version = "0.0.0",
+    .fingerprint = 0xbef4255834a766ea,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .zuuid_lib = .{
+            .url = "https://codeload.github.com/dxps/zuuid/tar.gz/d953be4e73e451a98af6003482f1816542000ef7",
+            .hash = "zuuid-0.1.0-ARPhldIbAACuPl9lzX-q1c_R33XOVD9WoLoa42JMt7mn",
+            .branch = "main",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
