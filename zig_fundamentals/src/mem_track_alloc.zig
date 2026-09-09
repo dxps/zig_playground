@@ -26,10 +26,7 @@ fn printRow(
         .{ value, unit },
     ) catch unreachable;
 
-    std.debug.print(
-        "| {s:<20} | {s:<22} |\n",
-        .{ action, result },
-    );
+    std.debug.print("| {s:<20} | {s:<22} |\n", .{ action, result });
 }
 
 fn printChange(
@@ -48,19 +45,19 @@ fn printChange(
     printRow(action, current, "bytes");
 }
 
-pub const TrackingAllocator = struct {
+pub const MemTrackAllocator = struct {
     allocator: std.mem.Allocator,
     allocBytes: usize,
 
-    pub fn init(allocator: std.mem.Allocator) TrackingAllocator {
-        return TrackingAllocator{
+    pub fn init(allocator: std.mem.Allocator) MemTrackAllocator {
+        return MemTrackAllocator{
             .allocator = allocator,
             .allocBytes = 0,
         };
     }
 
     pub fn alloc(
-        self: *TrackingAllocator,
+        self: *MemTrackAllocator,
         comptime T: type,
         n: usize,
     ) ![]T {
@@ -71,17 +68,13 @@ pub const TrackingAllocator = struct {
         self.allocBytes += @sizeOf(T) * n;
         const allocated = self.allocBytes - initialValue;
 
-        printChange(
-            "allocated",
-            allocated,
-            self.allocBytes,
-        );
+        printChange("allocated", allocated, self.allocBytes);
 
         return slice;
     }
 
     pub fn free(
-        self: *TrackingAllocator,
+        self: *MemTrackAllocator,
         comptime T: type,
         slice: []T,
     ) void {
@@ -93,16 +86,12 @@ pub const TrackingAllocator = struct {
 
             const freed = initialValue - self.allocBytes;
 
-            printChange(
-                "freed",
-                freed,
-                self.allocBytes,
-            );
+            printChange("freed", freed, self.allocBytes);
         }
     }
 
     pub fn create(
-        self: *TrackingAllocator,
+        self: *MemTrackAllocator,
         comptime T: type,
     ) !*T {
         const initialValue = self.allocBytes;
@@ -112,17 +101,13 @@ pub const TrackingAllocator = struct {
         self.allocBytes += @sizeOf(T);
         const allocated = self.allocBytes - initialValue;
 
-        printChange(
-            "allocated",
-            allocated,
-            self.allocBytes,
-        );
+        printChange("allocated", allocated, self.allocBytes);
 
         return memory;
     }
 
     pub fn destroy(
-        self: *TrackingAllocator,
+        self: *MemTrackAllocator,
         comptime T: type,
         memory: *T,
     ) void {
@@ -133,37 +118,25 @@ pub const TrackingAllocator = struct {
 
         const freed = initialValue - self.allocBytes;
 
-        printChange(
-            "freed",
-            freed,
-            self.allocBytes,
-        );
+        printChange("freed", freed, self.allocBytes);
     }
 
-    pub fn bytesAllocated(self: *TrackingAllocator) usize {
+    pub fn bytesAllocated(self: *MemTrackAllocator) usize {
         return self.allocBytes;
     }
 
-    pub fn printBits(self: TrackingAllocator) void {
-        printRow(
-            "-",
-            self.allocBytes * bitsInByte,
-            "bits",
-        );
+    pub fn printBits(self: MemTrackAllocator) void {
+        printRow("-", self.allocBytes * bitsInByte, "bits");
     }
 
-    pub fn printBytes(self: TrackingAllocator) void {
-        printRow(
-            "-",
-            self.allocBytes,
-            "bytes",
-        );
+    pub fn printBytes(self: MemTrackAllocator) void {
+        printRow("-", self.allocBytes, "bytes");
     }
 };
 
 pub fn main(_: std.process.Init.Minimal) !void {
     const allocator = std.heap.page_allocator;
-    var trackingAllocator = TrackingAllocator.init(allocator);
+    var trackingAllocator = MemTrackAllocator.init(allocator);
 
     printHeader();
 

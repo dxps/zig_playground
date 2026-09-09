@@ -264,27 +264,27 @@ pub fn build(b: *std.Build) void {
     run_slices_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
-    // memory_allocators
+    // mem_allocs
     // ---------------------------------------------------------------------------
 
-    const memory_allocators_exe = b.addExecutable(.{
-        .name = "memory_allocators",
+    const mem_allocs_exe = b.addExecutable(.{
+        .name = "mem_allocs",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/memory_allocators.zig"),
+            .root_source_file = b.path("src/mem_allocs.zig"),
             .target = target,
             .optimize = optimize,
         }),
     });
-    b.installArtifact(memory_allocators_exe);
+    b.installArtifact(mem_allocs_exe);
 
-    const run_memory_allocators_step = b.step(
-        "run-memory-allocators",
+    const run_mem_allocs_step = b.step(
+        "run-mem-allocs",
         "Run the memory allocators example",
     );
-    const run_memory_allocators_cmd = b.addRunArtifact(memory_allocators_exe);
-    run_memory_allocators_step.dependOn(&run_memory_allocators_cmd.step);
-    run_memory_allocators_cmd.step.dependOn(b.getInstallStep());
-    run_memory_allocators_cmd.addPassthruArgs();
+    const run_mem_allocs_cmd = b.addRunArtifact(mem_allocs_exe);
+    run_mem_allocs_step.dependOn(&run_mem_allocs_cmd.step);
+    run_mem_allocs_cmd.step.dependOn(b.getInstallStep());
+    run_mem_allocs_cmd.addPassthruArgs();
 
     // ---------------------------------------------------------------------------
 

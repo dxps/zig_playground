@@ -12,7 +12,7 @@ Small, independent executables that illustrate different concepts, idioms and fe
     - `zig build run-pointer-immutable`
     - `zig build run-slice-immutable`
 - Alternatively, run any example using the classic `zig run src/<example.zig>`,<br/>
-  such as `zig run src/alloc_tracking.zig`.
+  such as `zig run src/mem_track_alloc.zig`.
 - List all available build and run steps: `zig build --help`
 - Build every executable without running it: `zig build`
 - Run all tests: `zig build test`
