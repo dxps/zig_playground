@@ -1,6 +1,6 @@
 # Zig Fundamentals
 
-Small, independent executables that illustrate different Zig language concepts.
+Small, independent executables that illustrate different concepts, idioms and features of the Zig programming language.
 
 <br/>
 
@@ -11,9 +11,8 @@ Small, independent executables that illustrate different Zig language concepts.
     - `zig build run-pointer-mutability`
     - `zig build run-pointer-immutable`
     - `zig build run-slice-immutable`
+- Alternatively, run any example using the classic `zig run src/<example.zig>`,<br/>
+  such as `zig run src/alloc_tracking.zig`.
 - List all available build and run steps: `zig build --help`
 - Build every executable without running it: `zig build`
 - Run all tests: `zig build test`
-
-Alternatively, each example can be run using the classic `zig build run src/<example.zig>, <br/>
-such as `zig run src/std_arraylist.zig`.
