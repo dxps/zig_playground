@@ -45,6 +45,10 @@ fn printChange(
     printRow(action, current, "bytes");
 }
 
+/// This is a simple and minimal custom memory tracking allocator,\
+/// offering only `alloc` and `free`, `create` and `destroy` methods.\
+/// It tracks the number of bytes allocated and freed.\
+/// And it is not thread safe.
 pub const MemTrackAllocator = struct {
     allocator: std.mem.Allocator,
     allocBytes: usize,
@@ -150,7 +154,9 @@ pub fn main(_: std.process.Init.Minimal) !void {
         item.* = @as(i16, @intCast(index)) * 2;
     }
 
-    // Allocate some more memory
+    // Allocate some more memory. We don't store the pointer to it
+    // as this is just for learning and demonstration purposes.
+    // In real life, this would be a memory leak.
     _ = try trackingAllocator.alloc(i32, n);
 
     trackingAllocator.free(i16, slice);
